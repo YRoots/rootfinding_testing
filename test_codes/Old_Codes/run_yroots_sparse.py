@@ -31,7 +31,7 @@ from yroots import MultiPower  # noqa: E402
 # Test configuration
 dim = 7
 mindeg = 2
-maxdeg = 6
+maxdeg = 7
 nonzero = 3
 num_tests = 100
 
