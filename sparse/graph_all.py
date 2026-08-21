@@ -11,7 +11,7 @@ plt.rcParams["figure.dpi"] = 400
 
 # Which dimensions to generate graphs for. Add/remove freely; the max
 # degree for each one is looked up from DIM_MAX_DEGREES below.
-DIMS_TO_PLOT = [2, 3, 4, 5, 6, 7, 8]
+DIMS_TO_PLOT = [2, 3, 4, 5]
 
 # Max degree to plot, per dimension. Add an entry here before adding a
 # new dimension to DIMS_TO_PLOT.
@@ -44,13 +44,13 @@ METHODS = {
         "path": "results/yroots_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "royalblue",
     },
+    "Yroots2": {
+            "path": "results/yroots_results-optimize/dim{dim}/nonzero{nonzero}/{arg}.txt",
+            "color": "teal",
+        },
     "Jroots": {
         "path": "results/jroots_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "navy",
-    },
-    "Jroots2": {
-        "path": "results/jroots_results2/dim{dim}/nonzero{nonzero}/{arg}.txt",
-        "color": "black",
     },
     "MTV": {
         "path": "results/telen_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
@@ -91,16 +91,16 @@ METHODS = {
 # deleting its config above. Keys must match METHODS.
 METHODS_ENABLED = {
     "Yroots": True,
+    "Yroots2": True,
     "Jroots": True,
-    "Jroots2": True,
     "MTV": True,
     "Bertini": True,
     "NSolveValues": True,
     "Reduce": True,
     "Chebfun": True,
     "Yroots-Lambda": False,
-    "Jroots-Lambda": True,
-    "Croots": True,
+    "Jroots-Lambda": False,
+    "Croots": False,
 }
 
 

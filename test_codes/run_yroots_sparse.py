@@ -1,134 +1,138 @@
-from yroots import MultiPower
-import yroots as yr
+"""Benchmark yroots on the sparse polynomial test suite.
+
+For every degree in the range below, this solves num_tests systems of dim
+sparse power basis polynomials on [-1, 1]^dim and writes, under
+``<result_dir>/dim{dim}/nonzero{nonzero}/``:
+
+    avg_times.txt              average solve time, one value per degree
+    max_resids.txt             max |f_i(root)|, one value per degree
+    avg_resids.txt             mean |f_i(root)|, one value per degree
+    sum_resids.txt             sum of |f_i(root)|, one value per degree
+    roots/roots_deg{deg}.json  {test number: roots} for that degree
+
+The .txt files hold one plain value per line in degree order; the JSON files
+match the layout the Julia benchmark writes, so the two can be diffed directly.
+"""
+
+import json
+import sys
+import time
+from pathlib import Path
+
 import numpy as np
-from time import time
-import os
+
+# Import yroots from this checkout instead of whatever is installed.
+yroots_dir = Path("/data1/acme/Roots/hyun/Rootfinding-serial")
+sys.path.insert(0, str(yroots_dir))
+
+import yroots as yr  # noqa: E402
+from yroots import MultiPower  # noqa: E402
+
+# Test configuration
+dim = 7
+mindeg = 2
+maxdeg = 6
+nonzero = 3
+num_tests = 100
+
+coeff_dir = Path("../sparse/coeffs")
+result_dir = Path("../sparse/results/yroots_results-optimize")
+append = False  # True to add degrees to an existing run instead of overwriting it
+
+SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 
 
-def residuals(dim, funcs, roots):
-    """Compute |f_i(roots[j])| for each i,j."""
-    res = []
-    for i in range(dim):
-        row = []
-        for root in roots:
-            row.append(abs(funcs[i](root))[0])
-        res.append(row)
-    return res
+def load_degree(coeff_dir, dim, deg, nonzero):
+    """Load every test for one dim/degree/sparsity, shape (n_tests, dim, n_terms, dim+1).
 
-def full_coeff_matrix(dim, deg, test_num):
-    # Designed to work with run_test in run_yroots_test2.py
-    # Creates the coefficient matrix of a test of given dim and degree
-
-    # Create coeff matrix shape
-    shape = [dim] + [(deg+1)]*dim
-    coeff_matrix = np.zeros(shape)
-
-    # Get the idxs and values of the nonzero terms
-    coordinates = np.array(test_num[:, :, :dim], dtype=int)
-    values = test_num[:, :, dim]
+    The last axis holds an exponent per dimension followed by the coefficient.
+    """
+    return np.load(coeff_dir / f"dim{dim}" / f"deg{deg}" / f"num{nonzero}.npy")
 
 
+def coeff_matrix(test, dim, deg):
+    """Expand one test's sparse terms into a dense coefficient tensor per function."""
+    coeffs = np.zeros((dim,) + (deg + 1,) * dim)
+    exponents = test[:, :, :dim].astype(int)
+    values = test[:, :, dim]
     for func in range(dim):
-        for i, idx in enumerate(coordinates[func]):
-            coeff_matrix[func, *idx] = values[func, i]
+        for idx, value in zip(exponents[func], values[func]):
+            coeffs[(func, *idx)] = value
+    return coeffs
 
-    return coeff_matrix
 
-def run_test(dim, deg, nonzero, num, roots_only=True):
-    """
-    Load the num-th test’s coefficient block from
-      coeffs/dim{dim}/deg{deg}/num{nonzero}.npy
-    and solve.
-    """
-    data = np.load(f"../sparse/coeffs/dim{dim}/deg{deg}/num{nonzero}.npy")
-    coeffs = full_coeff_matrix(dim, deg, data[num - 1])
-    a = -np.ones(dim)
-    b = np.ones(dim)
+def residuals(funcs, roots):
+    """|f_i(root_j)| for every function i and root j, shape (len(funcs), len(roots))."""
+    return np.array([np.abs(f(roots)) for f in funcs])
 
-    funcs = [MultiPower(c) for c in coeffs]
-    if roots_only:
-        return yr.solve(funcs, a, b)
-    else:
-        start = time()
-        roots = yr.solve(funcs, a, b)
-        t = time() - start
-        return residuals(dim, funcs, roots), roots, t
+
+def solve_test(funcs, dim):
+    """Solve one system on [-1, 1]^dim, returning the roots and the elapsed seconds."""
+    start = time.perf_counter()
+    roots = yr.solve(funcs, -np.ones(dim), np.ones(dim))
+    return roots, time.perf_counter() - start
+
+
+def write_roots_json(path, roots_by_test):
+    """Write {test number: list of roots}, one root per line, sorted by test number."""
+    with open(path, "w") as f:
+        f.write("{\n")
+        items = sorted(roots_by_test.items())
+        for i, (test, roots) in enumerate(items):
+            rows = ",\n".join("    " + json.dumps(root, separators=(",", ":"))
+                              for root in np.asarray(roots).tolist())
+            body = f"[\n{rows}\n  ]" if len(roots) else "[]"
+            f.write(f'  "{test}": {body}')
+            f.write(",\n" if i < len(items) - 1 else "\n")
+        f.write("}\n")
+
+
+def append_value(path, value):
+    with open(path, "a") as f:
+        f.write(f"{value:.17g}\n")
+
+
+def main():
+    base_dir = result_dir / f"dim{dim}" / f"nonzero{nonzero}"
+    roots_dir = base_dir / "roots"
+    roots_dir.mkdir(parents=True, exist_ok=True)
+
+    summary_paths = {name: base_dir / f"{name}.txt" for name in SUMMARIES}
+    if not append:
+        for path in summary_paths.values():
+            path.write_text("")
+
+    for deg in range(mindeg, maxdeg + 1):
+        print(f"--- Dim {dim} Degree {deg}/{maxdeg} ---", flush=True)
+        tests = load_degree(coeff_dir, dim, deg, nonzero)
+        reps = min(num_tests, len(tests))
+
+        if deg == mindeg:
+            # Warm up numba's JIT so it isn't charged to the first timed test.
+            solve_test([MultiPower(c) for c in coeff_matrix(tests[0], dim, deg)], dim)
+
+        times, all_res, roots_by_test = [], [], {}
+        for test in range(reps):
+            if (test + 1) % 10 == 0:
+                print(f"  test {test + 1}/{reps}", flush=True)
+
+            funcs = [MultiPower(c) for c in coeff_matrix(tests[test], dim, deg)]
+            roots, elapsed = solve_test(funcs, dim)
+
+            times.append(elapsed)
+            all_res.extend(residuals(funcs, roots).ravel())
+            roots_by_test[test + 1] = roots
+
+        write_roots_json(roots_dir / f"roots_deg{deg}.json", roots_by_test)
+
+        res = np.array(all_res)
+        append_value(summary_paths["avg_times"], np.mean(times) if times else np.nan)
+        append_value(summary_paths["max_resids"], res.max() if res.size else np.nan)
+        append_value(summary_paths["avg_resids"], res.mean() if res.size else np.nan)
+        append_value(summary_paths["sum_resids"], res.sum() if res.size else np.nan)
+
+    print("Program Finished")
 
 
 if __name__ == "__main__":
-    dim = 2
-    mindeg = 2
-    maxdeg = 30
-    nonzero = 3
-    num_tests = 100
-
-    # Warm-up (JIT, caches, etc.)
-    run_test(dim, 2, nonzero, 1)
-    
-    # Warm-up all of degree 2 (these results in lower averge time for deg 2)
-    # for i in range(num_tests):
-    #     run_test(dim, 2, nonzero, i)
-
-    # Base output directories
-    base_dir = f"../sparse/results/yroots_results/dim{dim}/nonzero{nonzero}"
-    os.makedirs(base_dir, exist_ok=True)
-
-    # Summary file paths (parent folder)
-    avg_time_path  = os.path.join(base_dir, "avg_times.txt")
-    max_resid_path = os.path.join(base_dir, "max_resids.txt")
-    avg_resid_path = os.path.join(base_dir, "avg_resids.txt")
-    sum_resid_path = os.path.join(base_dir, "sum_resids.txt")
-
-    # Wipe file data
-    for file in  [avg_time_path, max_resid_path, avg_resid_path, sum_resid_path]:
-        with open(file, "w") as f: # Change this to 'a' when adding number of degrees
-            pass
-
-    # Helper: append one plain value per degree (no headers, no degree number)
-    def append_value(path, value):
-        with open(path, "a") as f:
-            f.write(f"{value:.17g}\n")
-
-    for deg in range(mindeg, maxdeg + 1):
-        print(f"--- Dim {dim} Degree {deg}/{maxdeg} ---")
-
-        # Per-degree folder for roots
-        out_dir = os.path.join(base_dir, f"deg{deg}")
-        os.makedirs(out_dir, exist_ok=True)
-
-        roots_test_path = os.path.join(out_dir, "roots_tests.txt")
-        roots_file = open(roots_test_path, "w") # Change to 'a' when adding number of tests
-
-        all_times = []
-        all_res   = []
-
-        for test in range(num_tests):
-            if (test + 1) % 10 == 0:
-                print(f"  test {test + 1}/{num_tests}")
-
-            res, roots, t = run_test(dim, deg, nonzero, test + 1, roots_only=False)
-            all_times.append(t)
-            all_res.extend(np.array(res).flatten())
-
-            # Save roots per test into the per-degree folder
-            # np.save(os.path.join(out_dir, f"roots_test{test + 1}.npy"), roots)
-            roots_file.write(f"Test {test + 1}\n")
-            np.savetxt(roots_file, roots, fmt="%.17g") 
-            roots_file.write("\n")
-
-        roots_file.close()
-
-        # Compute summaries for this degree
-        arr = np.array(all_res)
-        avg_time  = float(np.mean(all_times)) if all_times else float("nan")
-        max_resid = float(arr.max())          if arr.size   else float("nan")
-        avg_resid = float(arr.mean())         if arr.size   else float("nan")
-        sum_resid = float(arr.sum())          if arr.size   else float("nan")
-
-        # Append values (one per line, in degree order)
-        append_value(avg_time_path,  avg_time)
-        append_value(max_resid_path, max_resid)
-        append_value(avg_resid_path, avg_resid)
-        append_value(sum_resid_path, sum_resid)
-
-    print("Program Finished")
+    main()

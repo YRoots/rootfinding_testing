@@ -1,11 +1,11 @@
-include("../../hyun/Julia-optimize/src/CombinedSolver.jl")
+include("../../hyun/Julia-Rootfinding/src/CombinedSolver.jl")
 using NPZ
 using DelimitedFiles
 using Statistics
 using JSON3
 
-dim = 8
-degs = 2:10
+dim = 2
+degs = 2:30
 nonzero = 3
 numtests = 100
 
@@ -77,7 +77,7 @@ function write_to_json(output_file, data)
     end
 end
 
-dir = "../sparse/results/jroots_results2/dim$(dim)/nonzero$(nonzero)"
+dir = "../sparse/results/jroots_results3/dim$(dim)/nonzero$(nonzero)"
 mkpath(dir)  # creates nested directories if missing
 
 files = ["avg_times.txt", "avg_resids.txt", "max_resids.txt", "sum_resids.txt"]
@@ -104,12 +104,14 @@ for deg in degs
     A = []
     roots = Dict()
     
-    # Minimize compilation time error by running a few tests without times
-    println("Starting warmup test")
-    flush(stdout)
-    for i in 1:10
-        f = [multipower_from_terms(coeffs[i, j, :, :], dim) for j in 1:dim]
-        solve(f,-ones(dim),ones(dim))
+    if deg == 2
+        # Minimize compilation time error by running a few tests without times
+        println("Starting warmup test")
+        flush(stdout)
+        for i in 1:10
+            f = [multipower_from_terms(coeffs[i, j, :, :], dim) for j in 1:dim]
+            solve(f,-ones(dim),ones(dim))
+        end
     end
 
     println("Starting tests")

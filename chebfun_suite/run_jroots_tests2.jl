@@ -1,4 +1,4 @@
-include("../sparse_poly/Julia-Rootfinding/src/CombinedSolver.jl")
+include("/data1/acme/Roots/hyun/Julia-Rootfinding/src/CombinedSolver.jl")
 using NPZ
 using DelimitedFiles
 using Statistics
@@ -398,10 +398,10 @@ for (i, test) in enumerate(tests)
 end
 
 # ensure output directory exists
-mkpath("jroots_results")
+mkpath("jroots_results2")
 
-writedlm("jroots_results/2d_times.txt", times)
-writedlm("jroots_results/2d_avg_resids.txt", avg_resids)
-writedlm("jroots_results/2d_max_resids.txt", max_resids)
+writedlm("jroots_results2/2d_times.txt", times)
+writedlm("jroots_results2/2d_avg_resids.txt", avg_resids)
+writedlm("jroots_results2/2d_max_resids.txt", max_resids)
 
-println("Saved results to jroots_results/")
+println("Saved results to jroots_results2/")

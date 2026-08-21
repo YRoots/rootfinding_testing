@@ -27,16 +27,19 @@ for arg in args:
     JR = open("jroots_results/2d_{}.txt".format(arg))
     JR = stacktoarray(JR.read())
 
-    NR = open("NSolveValues_results/2d_{}.txt".format(arg))
-    NR = stacktoarray(NR.read())
+    JR2 = open("jroots_results2/2d_{}.txt".format(arg))
+    JR2 = stacktoarray(JR.read())
 
-    RR = open("reduce_results/2d_{}.txt".format(arg))
-    RR = stacktoarray(RR.read())
+    # NR = open("NSolveValues_results/2d_{}.txt".format(arg))
+    # NR = stacktoarray(NR.read())
 
-    CR = open("chebfun_results/2d_{}.txt".format(arg))
-    CR = stacktoarray(CR.read())
+    # RR = open("reduce_results/2d_{}.txt".format(arg))
+    # RR = stacktoarray(RR.read())
 
-    line_args = [YR, JR, NR,RR,CR]
+    # CR = open("chebfun_results/2d_{}.txt".format(arg))
+    # CR = stacktoarray(CR.read())
+
+    line_args = [YR, JR, JR2]
 
     labels = ["Yroots","Jroots", "Chebfun","Reduce","NSolveValues"]
     colors = ["royalblue", "tab:purple", "tab:orange","tab:green","tab:red"]
@@ -60,5 +63,5 @@ for arg in args:
         ax.set_ylabel("Residual")
     ax.set_title("Chebfun Suite {}".format(arg_names[arg]))
     ax.legend()
-    plt.savefig("graphs/consistent_type_chebfun_suite_{}.pdf".format(arg), dpi=300,bbox_inches="tight")
+    plt.savefig("graphs/temp_chebfun_suite_{}.png".format(arg), dpi=300,bbox_inches="tight")
     plt.clf()
