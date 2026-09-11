@@ -25,12 +25,26 @@ TOL = 1e-8
 MAX_DIM = 8
 MAX_MISMATCHES_SHOWN = 10
 
+# yroots and jroots only search the box [-1, 1]^d, so a bertini root outside it
+# is not something they could ever have returned and counting it as a
+# disagreement is misleading. Bertini roots further than DOMAIN_TOL outside the
+# box are dropped before comparing. Set DOMAIN_RADIUS to None to compare
+# bertini's raw output instead.
+DOMAIN_RADIUS = 1.0
+DOMAIN_TOL = 1e-8
+
 METHOD_DIRS = {
     "bertini": os.path.join(RESULTS, "bertini_results", BERTINI_VERSION),
     "jroots": os.path.join(RESULTS, "jroots_results"),
-    "yroots": os.path.join(RESULTS, "yroots_results"),
-    "yroots_opt": os.path.join(RESULTS, "yroots_results-optimize"),
+    "yroots": os.path.join(RESULTS, "yroots_results")
 }
+
+# Methods compared against bertini, and whether their JSON stores coordinates
+# in reverse order (xd, ..., x1) rather than bertini's (x1, ..., xd).
+COMPARED = (
+    ("jroots", True),
+    ("yroots", False)
+)
 
 
 def parse_bertini_txt(path, dim):
@@ -78,6 +92,13 @@ def parse_json_roots(path, reverse=False):
     return results
 
 
+def in_domain(root):
+    """True if a root lies inside [-1, 1]^d, within DOMAIN_TOL."""
+    if DOMAIN_RADIUS is None:
+        return True
+    return all(abs(v) <= DOMAIN_RADIUS + DOMAIN_TOL for v in root)
+
+
 def roots_match(ref, other, tol=TOL):
     """Greedy unordered match. Returns (ok, detail) where detail explains a failure."""
     if len(ref) != len(other):
@@ -111,77 +132,140 @@ def degrees_in(base, dim, is_bertini):
     return degs
 
 
-def common_degrees(dim):
-    sets = [
-        degrees_in(METHOD_DIRS["bertini"], dim, is_bertini=True),
-        degrees_in(METHOD_DIRS["jroots"], dim, is_bertini=False),
-        degrees_in(METHOD_DIRS["yroots"], dim, is_bertini=False),
-        degrees_in(METHOD_DIRS["yroots_opt"], dim, is_bertini=False),
-    ]
-    if not all(sets):
+def method_names():
+    return ["bertini"] + [name for name, _ in COMPARED]
+
+
+def search_dir(name, dim):
+    """The directory this method's roots_deg* files are expected in."""
+    d = os.path.join(METHOD_DIRS[name], f"dim{dim}", f"nonzero{NONZERO}")
+    return d if name == "bertini" else os.path.join(d, "roots")
+
+
+def degrees_by_method(dim):
+    """{method: set of degrees found} for one dimension."""
+    return {name: degrees_in(METHOD_DIRS[name], dim, is_bertini=(name == "bertini"))
+            for name in method_names()}
+
+
+def common_degrees(dim, found=None):
+    """Degrees present for every method. `found` receives the per-method sets."""
+    per_method = degrees_by_method(dim)
+    if found is not None:
+        found.update(per_method)
+    if not all(per_method.values()):
         return []
-    return sorted(set.intersection(*sets))
+    return sorted(set.intersection(*per_method.values()))
+
+
+def diagnose():
+    """Explain why nothing was compared, listing every path that was searched."""
+    print("Nothing was compared. Checking each configured result directory:\n")
+    for name in method_names():
+        root = METHOD_DIRS[name]
+        mark = "ok     " if os.path.isdir(root) else "MISSING"
+        print(f"  [{mark}] {name:11s} {root}")
+    print()
+
+    for dim in range(2, MAX_DIM + 1):
+        per_method = degrees_by_method(dim)
+        if not any(per_method.values()):
+            continue
+        have = [n for n in method_names() if per_method[n]]
+        lack = [n for n in method_names() if not per_method[n]]
+        print(f"  dim {dim}: found degrees for {', '.join(have)}; "
+              f"nothing for {', '.join(lack)}")
+        for name in lack:
+            d = search_dir(name, dim)
+            if not os.path.isdir(d):
+                print(f"      {name}: no such directory {d}")
+            else:
+                names = sorted(os.listdir(d))[:5]
+                print(f"      {name}: {d} exists but holds no roots_deg*.txt/.json"
+                      f"{' (contains: ' + ', '.join(names) + ')' if names else ' (empty)'}")
+    print("\nAdjust BASE/RESULTS, BERTINI_VERSION, NONZERO or METHOD_DIRS at the "
+          "top of this script to match this checkout.")
 
 
 def load_all(dim, deg):
+    """Load bertini plus every compared method -> (bertini, {name: roots})."""
     bertini = parse_bertini_txt(
-        os.path.join(METHOD_DIRS["bertini"], f"dim{dim}", f"nonzero{NONZERO}", f"roots_deg{deg}.txt"),
+        os.path.join(METHOD_DIRS["bertini"], f"dim{dim}", f"nonzero{NONZERO}",
+                     f"roots_deg{deg}.txt"),
         dim,
     )
-    jroots = parse_json_roots(
-        os.path.join(METHOD_DIRS["jroots"], f"dim{dim}", f"nonzero{NONZERO}", "roots", f"roots_deg{deg}.json"),
-        reverse=True,
-    )
-    yroots = parse_json_roots(
-        os.path.join(METHOD_DIRS["yroots"], f"dim{dim}", f"nonzero{NONZERO}", "roots", f"roots_deg{deg}.json"),
-    )
-    yroots_opt = parse_json_roots(
-        os.path.join(METHOD_DIRS["yroots_opt"], f"dim{dim}", f"nonzero{NONZERO}", "roots", f"roots_deg{deg}.json"),
-    )
-    return bertini, jroots, yroots, yroots_opt
+    bertini = {t: [r for r in roots if in_domain(r)] for t, roots in bertini.items()}
+    others = {
+        name: parse_json_roots(
+            os.path.join(METHOD_DIRS[name], f"dim{dim}", f"nonzero{NONZERO}",
+                         "roots", f"roots_deg{deg}.json"),
+            reverse=reverse,
+        )
+        for name, reverse in COMPARED
+    }
+    return bertini, others
 
 
 def main():
     grand_tests = 0
+    grand_comparisons = 0
     grand_mismatches = 0
 
     for dim in range(2, MAX_DIM + 1):
-        degs = common_degrees(dim)
+        found = {}
+        degs = common_degrees(dim, found)
         if not degs:
+            if any(found.values()):
+                lack = [n for n in method_names() if not found[n]]
+                print(f"=== dim {dim}: skipped -- no roots_deg* files for "
+                      f"{', '.join(lack)} ===")
             continue
 
         dim_tests = 0
+        dim_comparisons = 0
         dim_mismatches = []
 
         for deg in degs:
-            bertini, jroots, yroots, yroots_opt = load_all(dim, deg)
-            all_tests = sorted(set(bertini) | set(jroots) | set(yroots) | set(yroots_opt))
+            bertini, others = load_all(dim, deg)
+            all_tests = sorted(set(bertini).union(*(set(o) for o in others.values())))
 
             for t in all_tests:
                 dim_tests += 1
-                ref = bertini.get(t, [])
-                for name, roots in (
-                    ("jroots", jroots.get(t, [])),
-                    ("yroots", yroots.get(t, [])),
-                    ("yroots_opt", yroots_opt.get(t, [])),
-                ):
-                    ok, detail = roots_match(ref, roots)
+                if t not in bertini:
+                    dim_comparisons += len(others)
+                    dim_mismatches.append(
+                        (deg, t, "-", "test absent from bertini file"))
+                    continue
+                for name in others:
+                    dim_comparisons += 1
+                    if t not in others[name]:
+                        dim_mismatches.append(
+                            (deg, t, name, f"test absent from {name} file"))
+                        continue
+                    ok, detail = roots_match(bertini[t], others[name][t])
                     if not ok:
                         dim_mismatches.append((deg, t, name, detail))
 
         grand_tests += dim_tests
+        grand_comparisons += dim_comparisons
         grand_mismatches += len(dim_mismatches)
 
         print(f"=== dim {dim}: degrees {degs[0]}-{degs[-1]} ({len(degs)} degrees), "
-              f"{dim_tests} test cases compared, {len(dim_mismatches)} mismatches ===")
+              f"{dim_tests} test cases compared, {len(dim_mismatches)} mismatches "
+              f"out of {dim_comparisons} comparisons ===")
         for (deg, t, name, detail) in dim_mismatches[:MAX_MISMATCHES_SHOWN]:
             print(f"    [deg {deg}, test {t}] {name} vs bertini: {detail}")
         if len(dim_mismatches) > MAX_MISMATCHES_SHOWN:
             print(f"    ... and {len(dim_mismatches) - MAX_MISMATCHES_SHOWN} more")
 
+    if grand_tests == 0:
+        print()
+        diagnose()
+
     print("\n===== GRAND SUMMARY =====")
     print(f"Total test cases compared: {grand_tests}")
-    print(f"Total mismatches (jroots/yroots/yroots_opt vs bertini): {grand_mismatches}")
+    print(f"Total comparisons ({len(COMPARED)} methods x test cases): {grand_comparisons}")
+    print(f"Total mismatches vs bertini: {grand_mismatches}")
 
 
 if __name__ == "__main__":
