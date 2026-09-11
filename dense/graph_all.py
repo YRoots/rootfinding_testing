@@ -1,100 +1,188 @@
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mticker
-import os
+
+plt.rcParams["figure.dpi"] = 400
+
+# ----------------------------------------------------------------------
+# CONFIG — edit these to control what gets plotted
+# ----------------------------------------------------------------------
+
+# Which dimensions to generate graphs for. Add/remove freely; the max
+# degree for each one is looked up from DIM_MAX_DEGREES below.
+DIMS_TO_PLOT = [2, 3, 4, 5]
+
+# Every results file holds one value per degree, starting at this degree.
+MIN_DEGREE = 2
+
+# Highest degree to plot, per dimension. Methods with shorter files just
+# stop early. Add an entry here before adding a new dimension to
+# DIMS_TO_PLOT.
+DIM_MAX_DEGREES = {
+    2: 30,
+    3: 20,
+    4: 10,
+    5: 5,
+}
+
+# Marker drawn for a method that only has a single degree of data, where
+# a line would have nothing to connect and so would not show up at all.
+SINGLE_POINT_MARKER = "o"
+
+# Metric files to read, and the titles/axis labels to use for each.
+METRICS = {
+    "avg_times": {"title": "Dense Average Times", "ylabel": "Time Log Scale"},
+    "avg_resids": {"title": "Dense Average Residuals", "ylabel": "Residual"},
+    "max_resids": {"title": "Dense Max Residuals", "ylabel": "Residual"},
+    "sum_resids": {"title": "Dense Sum of Residuals", "ylabel": "Residual"},
+}
+
+# One entry per method/solver.
+#
+#   "path"      template filled in with dim/arg; the default for the method
+#   "arg_paths" per-metric override, e.g. Bertini stores times as .npy
+#   "dim_paths" per-dimension override, e.g. NSolveValues used a different
+#               layout for the low dimensions
+#   "dims"      restricts a method to specific dimensions (e.g. Chebfun only
+#               has dim-2 results); omit to include it for every dimension
+#
+# A path ending in .npy is loaded with np.load; anything else is parsed as
+# one plain value per line.
+METHODS = {
+    "Yroots": {
+        "path": "results/yroots_results/dim{dim}/{arg}.txt",
+        "color": "royalblue",
+    },
+    "Jroots": {
+        "path": "results/jroots_results/dim{dim}/{arg}.txt",
+        "color": "navy",
+    },
+    "MTV": {
+        "path": "results/telen_results/dim{dim}_{arg}.txt",
+        "color": "tab:purple",
+    },
+    "Bertini": {
+        "path": "results/bertini_results/dim{dim}_{arg}.txt",
+        "arg_paths": {
+            "avg_times": "results/bertini_results/dim{dim}_{arg}.npy",
+        },
+        "color": "tab:green",
+    },
+    "NSolveValues": {
+        "path": "results/NSolveValues_results/dim{dim}/{arg}.txt",
+        "dim_paths": {
+            2: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
+            3: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
+        },
+        "color": "tab:red",
+    },
+    "Reduce": {
+        "path": "results/reduce_results/dim{dim}_{arg}.txt",
+        "color": "m",
+    },
+    "Chebfun": {
+        "path": "results/chebfun_results/dim{dim}_{arg}.txt",
+        "color": "tab:orange",
+        "dims": {2},
+    },
+}
+
+# Flip a method to False to leave it out of every graph without
+# deleting its config above. Keys must match METHODS.
+METHODS_ENABLED = {
+    "Yroots": True,
+    "Jroots": True,
+    "MTV": True,
+    "Bertini": True,
+    "NSolveValues": True,
+    "Reduce": True,
+    "Chebfun": True,
+}
 
 
-def stacktoarray(list):
-    list = list.replace(" ", "")
-    list = list.replace("*^", "e")
-    list = list.split("\n")
-    while list[-1] == "":
-        list.pop()
-    for i in range(len(list)):
-        list[i] = abs(float(list[i]))
-    return list
+# ----------------------------------------------------------------------
+# CORE LOGIC
+# ----------------------------------------------------------------------
 
-args = ["avg_times", "avg_resids", "max_resids", "sum_resids"]
-names = ["Average Times", "Average Residuals", "Max Residuals", "Sum of Residuals"]
-dims = [4]
-plt.rcParams['figure.dpi'] = 400
+def parse_values(raw_text):
+    """Turn a results file's raw text into a list of absolute float values."""
+    raw_text = raw_text.replace(" ", "").replace("*^", "e")
+    return [abs(float(v)) for v in raw_text.split("\n") if v]
 
-for dim in dims:
-    for v, arg in enumerate(args):
-        # Read data of each method
-        YR = open("results/yroots_results/nov1/dim{}_{}_randn.txt".format(dim, arg))
-        YR = stacktoarray(YR.read())
-        YR = YR[:9]
 
-        JR = open("results/jroots_results/nov1/dim{}_{}.txt".format(dim, arg))
-        JR = stacktoarray(JR.read())
-        JR = JR[:9]
+def resolve_path(config, dim, arg):
+    """Pick the path template for this method/dim/arg and fill it in."""
+    template = config["path"]
+    if dim in config.get("dim_paths", {}):
+        template = config["dim_paths"][dim]
+    if arg in config.get("arg_paths", {}):
+        template = config["arg_paths"][arg]
+    return template.format(dim=dim, arg=arg)
 
-        TR = open("results/telen_results/dim{}_{}.txt".format(dim, arg))
-        TR = stacktoarray(TR.read())
 
-        if arg == "avg_times":
-            BR = np.load("results/bertini_results/dim{}_{}.npy".format(dim, arg))
+def load_method_series(config, dim, arg, max_deg):
+    """Load one method's series for a given dim/arg, truncated to max_deg."""
+    path = resolve_path(config, dim, arg)
+    try:
+        if path.endswith(".npy"):
+            values = np.abs(np.load(path)).ravel().tolist()
         else:
-            BR = open("results/bertini_results/dim{}_{}.txt".format(dim, arg))
-            BR = stacktoarray(BR.read())
+            with open(path) as f:
+                values = parse_values(f.read())
+    except FileNotFoundError:
+        print(f"  [skip] no data at {path}")
+        return None
+    return values[:max_deg - MIN_DEGREE + 1]
 
-        if dim in [2, 3]:
-            NR = open("results/NSolveValues_results/dim{}_{}2_cont.txt".format(dim, arg))
-        else:
-            NR = open("results/NSolveValues_results/dim{}/{}.txt".format(dim, arg))
-        NR = stacktoarray(NR.read())
 
-        if False and arg != "avg_times":
-            NRM = np.load("results/NSolveValues_results/dim2_missing_roots.npy")
-            NRD = np.load("results/NSolveValues_results/dim2_double_roots.npy")
+def plot_metric(dim, arg, max_deg):
+    info = METRICS[arg]
+    fig, ax = plt.subplots()
+    ax.set_yscale("log")
 
-        RR = open("results/reduce_results/dim{}_{}.txt".format(dim, arg))
-        RR = stacktoarray(RR.read())
+    for label, config in METHODS.items():
+        if not METHODS_ENABLED.get(label, True):
+            continue
+        if "dims" in config and dim not in config["dims"]:
+            continue
+        series = load_method_series(config, dim, arg, max_deg)
+        if not series:
+            continue
+        x = np.arange(MIN_DEGREE, MIN_DEGREE + len(series))
+        # A one-degree series has no segment to draw, so mark the point
+        # instead of drawing an invisible line.
+        marker = SINGLE_POINT_MARKER if len(series) == 1 else None
+        ax.plot(x, series, color=config["color"], marker=marker, label=label)
 
-        if dim == 2:
-            CR = open("results/chebfun_results/dim{}_{}.txt".format(dim, arg))
-            CR = stacktoarray(CR.read())
+    ax.set_ylabel(info["ylabel"])
+    ax.set_xlabel("Degree")
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    ax.legend()
+    plt.title(f"Dim {dim} {info['title']}")
 
-        # Graph each data
-        line_args = [YR, TR, BR, NR, RR, JR]
-        labels = ["Yroots", "MTV", "Bertini", "NSolveValues", "Reduce", "Jroots"]
-        colors = ["royalblue", "tab:purple", "tab:green", "tab:red", "m", "navy"]
+    out_dir = f"graphs/dim{dim}"
+    os.makedirs(out_dir, exist_ok=True)
+    plt.savefig(f"{out_dir}/dim{dim}_{arg}.png")
+    plt.close(fig)
 
-        if dim == 2:
-            line_args.append(CR)
-            labels.append("Chebfun")
-            colors.append("tab:orange")
-        
-        fig, ax1 = plt.subplots()
-        ax1.set_yscale("log")
-        for i in range(len(line_args)):
-            X = np.arange(2, min(len(line_args[i]), 30) + 2)
-            ax1.plot(X, line_args[i], colors[i], label=labels[i])
-        if arg == "avg_times":
-            ax1.set_ylabel("Time Log Scale")
-        else:
-            # ax1.set_ylim(1e-17,1)
-            ax1.set_ylabel("Residual")
-        plt.title("Dim {} {}".format(dim, names[v]))
-        ax1.set_xlabel("Degree")
-        ax1.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        ax1.legend()
-        #plt.savefig(
-        #    "graphs/dim{}_{}.pdf".format(dim, arg), dpi=300, bbox_inches="tight"
-        #)
 
-        os.makedirs(f"../graphs/dim{dim}", exist_ok=True)
+def main():
+    missing = set(METHODS) - set(METHODS_ENABLED)
+    if missing:
+        raise ValueError(
+            f"METHODS_ENABLED is missing entries for: {sorted(missing)}"
+        )
 
-        plt.savefig("../graphs/dim{}/dim{}_{}.png".format(dim, dim, arg))
-        plt.clf()
+    for dim in DIMS_TO_PLOT:
+        if dim not in DIM_MAX_DEGREES:
+            raise ValueError(
+                f"No max-degree entry for dim {dim} — add one to DIM_MAX_DEGREES."
+            )
+        max_deg = DIM_MAX_DEGREES[dim]
+        for arg in METRICS:
+            plot_metric(dim, arg, max_deg)
 
-    # Currently Unused Code
- 
-    # X = np.arange(2,min(len(NRM),30)+2)
-    # plt.plot(X,NRM,":r",label="NSolveValues Missing Roots")
-    # plt.plot(X,NRD,"-.r",label="NSolveValues Double Roots")
-    # plt.legend()
-    # plt.ylim(0,300)
-    # plt.savefig("graphs/dim{}_NSolve_bad.png".format(dim))
-    # plt.clf()
+
+if __name__ == "__main__":
+    main()
