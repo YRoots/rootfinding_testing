@@ -1,7 +1,17 @@
 import numpy as np
-from yroots.Combined_Solver import solve
 from time import time
 from matplotlib import pyplot as plt
+import sys
+from pathlib import Path
+
+import numpy as np
+
+# Import yroots from this checkout instead of whatever is installed.
+YROOTS_DIR = Path("/data1/acme/Roots/hyun/Rootfinding-serial")
+if YROOTS_DIR.is_dir():
+    sys.path.insert(0, str(YROOTS_DIR))
+
+import yroots as yr  # noqa: E402
 
 
 def resids(funcs, roots):
@@ -32,7 +42,7 @@ def test_roots_1_1():
     funcs = [f,g]
     a, b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
     return t, resids(funcs,yroots)
 
@@ -43,7 +53,7 @@ def test_roots_1_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -55,7 +65,7 @@ def test_roots_1_3():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -67,7 +77,7 @@ def test_roots_1_4():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -79,7 +89,7 @@ def test_roots_1_5():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -91,7 +101,7 @@ def test_roots_2_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -103,7 +113,7 @@ def test_roots_2_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -115,7 +125,7 @@ def test_roots_2_3():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -127,7 +137,7 @@ def test_roots_2_4():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -139,7 +149,7 @@ def test_roots_2_5():
     funcs = [f,g]
     a,b = np.array([-4,-4]), np.array([4,4])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -151,7 +161,7 @@ def test_roots_3_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -163,7 +173,7 @@ def test_roots_3_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -176,7 +186,7 @@ def test_roots_4_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -206,7 +216,7 @@ def test_roots_4_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -218,7 +228,7 @@ def test_roots_5():
     funcs = [f,g]
     a,b = np.array([-2,-2]), np.array([2,2])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -230,7 +240,7 @@ def test_roots_6_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -242,7 +252,7 @@ def test_roots_6_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -254,7 +264,7 @@ def test_roots_6_3():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -266,7 +276,7 @@ def test_roots_7_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -279,7 +289,7 @@ def test_roots_7_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -292,7 +302,7 @@ def test_roots_7_3():
     funcs = [f,g]
     a,b = np.array([-1e-9, -1e-9]), np.array([1e-9, 1e-9])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -304,7 +314,7 @@ def test_roots_7_4():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -316,7 +326,7 @@ def test_roots_8_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -328,7 +338,7 @@ def test_roots_8_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -340,7 +350,7 @@ def test_roots_9_1():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -352,7 +362,7 @@ def test_roots_9_2():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)
@@ -364,7 +374,7 @@ def test_roots_10():
     funcs = [f,g]
     a,b = np.array([-1,-1]), np.array([1,1])
     start = time()
-    yroots = solve(funcs,a,b)
+    yroots = yr.solve(funcs,a,b)
     t = time() - start
 
     return t, resids(funcs,yroots)

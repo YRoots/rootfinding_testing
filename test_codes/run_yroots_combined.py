@@ -51,11 +51,11 @@ SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 class Config:
     suite: str = "dense"          # "sparse" | "dense"
     backend: str = "multipower"    # "multipower" | "lambda"  (lambda: sparse only)
-    dim: int = 3
+    dim: int = 5
     mindeg: int = 2
-    maxdeg: int = 20
+    maxdeg: int = 10
     nonzero: int = 3               # sparse only: terms per polynomial
-    num_tests: int = 300
+    num_tests: int = 100
     dense_format: str = "npy"     # dense only: "json" (Mathematica .txt) | "npy"
     coeff_dir: Path | None = None  # defaults per suite
     result_dir: Path | None = None

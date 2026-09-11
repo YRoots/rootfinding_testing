@@ -11,7 +11,7 @@ plt.rcParams["figure.dpi"] = 400
 
 # Which dimensions to generate graphs for. Add/remove freely; the max
 # degree for each one is looked up from DIM_MAX_DEGREES below.
-DIMS_TO_PLOT = [2, 3, 4, 5]
+DIMS_TO_PLOT = [2, 3, 4, 5, 6, 7, 8]
 
 # Max degree to plot, per dimension. Add an entry here before adding a
 # new dimension to DIMS_TO_PLOT.
@@ -52,6 +52,10 @@ METHODS = {
         "path": "results/jroots_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "navy",
     },
+    "Jroots2": {
+            "path": "results/jroots_results2/dim{dim}/nonzero{nonzero}/{arg}.txt",
+            "color": "black",
+        },
     "MTV": {
         "path": "results/telen_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "tab:purple",
@@ -93,6 +97,7 @@ METHODS_ENABLED = {
     "Yroots": True,
     "Yroots2": True,
     "Jroots": True,
+    "Jroots2": True,
     "MTV": True,
     "Bertini": True,
     "NSolveValues": True,

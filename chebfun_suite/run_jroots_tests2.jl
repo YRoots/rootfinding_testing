@@ -1,4 +1,4 @@
-include("/data1/acme/Roots/hyun/Julia-Rootfinding/src/CombinedSolver.jl")
+include("../../hyun/Julia-Rootfinding/src/CombinedSolver.jl")
 using NPZ
 using DelimitedFiles
 using Statistics
