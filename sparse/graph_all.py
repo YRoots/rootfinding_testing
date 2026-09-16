@@ -44,18 +44,10 @@ METHODS = {
         "path": "results/yroots_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "royalblue",
     },
-    "Yroots2": {
-            "path": "results/yroots_results-optimize/dim{dim}/nonzero{nonzero}/{arg}.txt",
-            "color": "teal",
-        },
     "Jroots": {
         "path": "results/jroots_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "navy",
     },
-    "Jroots2": {
-            "path": "results/jroots_results2/dim{dim}/nonzero{nonzero}/{arg}.txt",
-            "color": "black",
-        },
     "MTV": {
         "path": "results/telen_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
         "color": "tab:purple",
@@ -95,9 +87,7 @@ METHODS = {
 # deleting its config above. Keys must match METHODS.
 METHODS_ENABLED = {
     "Yroots": True,
-    "Yroots2": True,
     "Jroots": True,
-    "Jroots2": True,
     "MTV": True,
     "Bertini": True,
     "NSolveValues": True,
