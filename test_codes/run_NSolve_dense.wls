@@ -82,7 +82,15 @@ sumResidFile = OpenWrite[FileNameJoin[{baseDir, "sum_resids.txt"}]];
 avgTimesFile = OpenWrite[FileNameJoin[{baseDir, "avg_times.txt"}]];
 numRootsFile = OpenWrite[FileNameJoin[{baseDir, "num_roots.txt"}]];  (* one line per degree: numTests ints *)
 
-numFmt[x_] := ToString[NumberForm[N[x, 17], {Infinity, 17}]];
+(* --- Force consistent one-line e-notation (ASCII), as in run_reduce_*.wls ---
+   ToString[NumberForm[...]] alone writes small numbers in the two-line
+   "mantissa x 10 / exponent" display form, which then reads back as garbage. *)
+numFmt[x_ /; !NumericQ[x]] := "nan";  (* e.g. Indeterminate for a degree with no roots *)
+numFmt[x_] := Module[{m, e, mm},
+  {m, e} = MantissaExponent[N[x, 50]];
+  mm = ToString[NumberForm[m, {Infinity, 17}]];
+  mm <> "e" <> ToString[e]
+];
 
 For[deg = minDeg, deg <= maxDeg, deg++,
 
@@ -157,9 +165,9 @@ For[deg = minDeg, deg <= maxDeg, deg++,
 
   (* ---- Per-degree summaries ---- *)
   (* Max/avg over ALL equations & ALL roots; single numbers per degree *)
-  perDegMax  = If[allResids === {}, Indeterminate, FortranForm[Max @ Flatten @ allResids]];
-  perDegAvg  = If[allResids === {}, Indeterminate, FortranForm[Mean @ Flatten @ allResids]];
-  perDegSum  = If[allResids === {}, Indeterminate, FortranForm[Total @ Flatten @ allResids]];
+  perDegMax  = If[allResids === {}, Indeterminate, Max @ Flatten @ allResids];
+  perDegAvg  = If[allResids === {}, Indeterminate, Mean @ Flatten @ allResids];
+  perDegSum  = If[allResids === {}, Indeterminate, Total @ Flatten @ allResids];
   perDegTime = If[allTimes  === {}, Indeterminate, Mean[allTimes]];
 
   WriteString[maxResidFile,  numFmt[perDegMax],  "\n"];

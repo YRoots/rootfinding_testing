@@ -86,6 +86,10 @@ METHODS = {
         "color": "tab:orange",
         "dims": {2},
     },
+    "HomotopyContinuation": {
+        "path": "results/hc_results/dim{dim}/{arg}.txt",
+        "color": "tab:brown",
+    },
 }
 
 # Flip a method to False to leave it out of every graph without
@@ -98,6 +102,7 @@ METHODS_ENABLED = {
     "NSolveValues": True,
     "Reduce": True,
     "Chebfun": True,
+    "HomotopyContinuation": True,
 }
 
 

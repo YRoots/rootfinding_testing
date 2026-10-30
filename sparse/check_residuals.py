@@ -131,7 +131,7 @@ def main():
                         "dim": dim, "deg": deg, "test": t, "root": root,
                         "found_by": sorted(names),
                         "resid": residual(test_coeffs, root),
-                        "in_box": all(abs(v) <= 1.0 + 1e-8 for v in root),
+                        "in_box": all(abs(v) <= 1.0 for v in root),
                     })
 
     if missing_coeffs:

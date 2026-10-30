@@ -128,13 +128,13 @@ for deg in degs
             A = A[mask]
             A = real.(A)
 
-            # (b) inside (-1,1) strictly (same as original)
+            # (b) inside the closed box [-1,1]^dim, the same rule as the other solvers
             mask = trues(length(A))
             for j in 1:length(A)
                 inside = true
                 for k in 1:dim
                     v = A[j][k]
-                    if v ≥ 1 || v ≤ -1
+                    if v > 1 || v < -1
                         inside = false
                         break
                     end

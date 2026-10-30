@@ -27,11 +27,12 @@ MAX_MISMATCHES_SHOWN = 10
 
 # yroots and jroots only search the box [-1, 1]^d, so a bertini root outside it
 # is not something they could ever have returned and counting it as a
-# disagreement is misleading. Bertini roots further than DOMAIN_TOL outside the
-# box are dropped before comparing. Set DOMAIN_RADIUS to None to compare
+# disagreement is misleading. Bertini roots outside the closed box (plus
+# DOMAIN_TOL, 0 so every solver uses the same rule) are dropped before
+# comparing. Set DOMAIN_RADIUS to None to compare
 # bertini's raw output instead.
 DOMAIN_RADIUS = 1.0
-DOMAIN_TOL = 1e-8
+DOMAIN_TOL = 0.0
 
 METHOD_DIRS = {
     "bertini": os.path.join(RESULTS, "bertini_results", BERTINI_VERSION),
