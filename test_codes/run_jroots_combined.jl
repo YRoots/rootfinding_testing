@@ -36,14 +36,26 @@ Overridden paths are used verbatim — result_dir, file_prefix and the dim/nonze
 folders are not applied to them. Missing parent folders are created either way.
 """
 
-# Path to the solver source. Adjust to wherever your checkout lives.
-const SOLVER_PATH = "../../hyun/Julia-Rootfinding/src/CombinedSolver.jl"
-include(SOLVER_PATH)
-
 using NPZ
 using JSON3
 using Statistics
 using Printf
+using DoubleFloats: Double64
+
+# Path to the solver source. Adjust to wherever your checkout lives.
+const SOLVER_PATH = "../../hyun/Julia-Rootfinding/src/CombinedSolver.jl"
+include(SOLVER_PATH)
+
+let src = dirname(SOLVER_PATH)
+    for file in ("StructsWithTheirFunctions/SolverOptions.jl",
+                 "StructsWithTheirFunctions/TrackedInterval.jl",
+                 "QuadraticCheck.jl",
+                 "ChebyshevApproximator.jl",
+                 "ChebyshevSubdivisionSolver.jl",
+                 "StructsWithTheirFunctions/Polynomial.jl")
+        include(joinpath(src, file))
+    end
+end
 
 const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 
@@ -55,9 +67,9 @@ const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 Base.@kwdef mutable struct Config
     suite::String = "dense"            # "sparse" | "dense"
     backend::String = "multipower"     # "multipower" | "lambda"  (lambda: sparse only)
-    dim::Int = 5
+    dim::Int = 2
     mindeg::Int = 2
-    maxdeg::Int = 15
+    maxdeg::Int = 30
     nonzero::Int = 3                   # sparse only: terms per polynomial
     num_tests::Int = 100
     dense_format::String = "npy"       # dense only: "json" (Mathematica .txt) | "npy"
@@ -65,7 +77,8 @@ Base.@kwdef mutable struct Config
     result_dir::Union{String,Nothing} = "../$(suite)/results/jroots_results2"
     append::Bool = false               # true to add degrees to an existing run
     warmup::Int = 10                   # untimed solves at mindeg to absorb JIT cost
-    zero_constant_term::Bool = false   # dense only: force the constant coefficient to 0
+    zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0,
+                                       # as the MTV/Bertini/Chebfun/NSolve dense runs do
     file_prefix::String = ""           # prepended to every output filename
     # Exact output paths, bypassing base_dir entirely. Keys of summary_files must be
     # among SUMMARIES; roots_file may contain {deg} and {dim} placeholders.

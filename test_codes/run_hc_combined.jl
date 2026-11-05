@@ -28,6 +28,18 @@ match the layout of run_jroots_combined.jl and run_yroots_combined.py, so the
 runs can be diffed directly with compare_roots.py.
 """
 
+# Threads HomotopyContinuation uses when Config.threading is true. Julia fixes its
+# thread count at startup, so if it was started with a different number the script
+# relaunches itself with this many. `nothing` keeps whatever Julia was started with
+# (`julia -t N`).
+const NUM_THREADS = nothing
+
+if NUM_THREADS !== nothing && Threads.nthreads() != NUM_THREADS &&
+   !isempty(PROGRAM_FILE) && !haskey(ENV, "HC_BENCH_RELAUNCHED")
+    cmd = `$(Base.julia_cmd()) --threads=$(NUM_THREADS) $(abspath(PROGRAM_FILE)) $(ARGS)`
+    exit(run(ignorestatus(addenv(cmd, "HC_BENCH_RELAUNCHED" => "1"))).exitcode)
+end
+
 using HomotopyContinuation
 using NPZ
 using JSON3
@@ -44,10 +56,10 @@ const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids",
 # ----------------------------------------------------------------------------
 
 Base.@kwdef mutable struct Config
-    suite::String = "dense"           # "sparse" | "dense"
-    dim::Int = 5
+    suite::String = "sparse"           # "sparse" | "dense"
+    dim::Int = 2
     mindeg::Int = 2
-    maxdeg::Int = 5
+    maxdeg::Int = 10
     nonzero::Int = 3                   # sparse only: terms per polynomial
     num_tests::Int = 100
     coeff_dir::Union{String,Nothing} = nothing   # defaults per suite
@@ -56,10 +68,12 @@ Base.@kwdef mutable struct Config
     warmup::Int = 10                   # untimed solves at mindeg to absorb JIT cost
     imag_tol::Float64 = 1e-10          # a root counts as real if max |imag| <= imag_tol
     box_tol::Float64 = 0.0             # keep roots with |x_k| <= 1 + box_tol
+    zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0,
+                                       # as the MTV/Bertini/Chebfun/NSolve dense runs do
     # HomotopyContinuation.solve options
     start_system::Symbol = :polyhedral # :polyhedral | :total_degree
     compile::Bool = false              # compiling costs seconds per new system support
-    threading::Bool = true            # false keeps timings single-core like the others
+    threading::Bool = false            # true uses NUM_THREADS threads (top of file)
     seed::UInt32 = 0x12345678          # fixes the random start system for reproducibility
 end
 
@@ -126,6 +140,7 @@ function term_lists(cfg::Config, coeff_data, test_num::Int)
             coeffs = Float64.(coeff_data[test_num, j, :, dim + 1])
         else
             tensor = coeff_data[test_num, j, ntuple(_ -> Colon(), dim)...]
+            cfg.zero_constant_term && (tensor[ntuple(_ -> 1, dim)...] = 0)
             idxs = [I for I in CartesianIndices(tensor) if tensor[I] != 0]
             exps = isempty(idxs) ? zeros(Int, 0, dim) :
                    reduce(vcat, [collect(Tuple(I))' .- 1 for I in idxs])
@@ -240,6 +255,7 @@ safe(stat, v) = isempty(v) ? NaN : stat(v)
 function run_benchmark(cfg::Config)
     resolve!(cfg)
     @var x[1:cfg.dim]
+    println("threading = $(cfg.threading), Julia threads = $(Threads.nthreads())")
 
     mkpath(joinpath(base_dir(cfg), "roots"))
     summary_paths = Dict(name => summary_path(cfg, name) for name in SUMMARIES)

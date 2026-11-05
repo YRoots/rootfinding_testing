@@ -53,13 +53,15 @@ class Config:
     backend: str = "multipower"    # "multipower" | "lambda"  (lambda: sparse only)
     dim: int = 5
     mindeg: int = 2
-    maxdeg: int = 10
+    maxdeg: int = 7
     nonzero: int = 3               # sparse only: terms per polynomial
     num_tests: int = 100
     dense_format: str = "npy"     # dense only: "json" (Mathematica .txt) | "npy"
     coeff_dir: Path | None = None  # defaults per suite
     result_dir: Path | None = None
     append: bool = False           # True to add degrees to an existing run
+    zero_constant_term: bool = True  # dense only: set every constant coefficient to 0,
+                                     # as the MTV/Bertini/Chebfun/NSolve dense runs do
 
     def __post_init__(self):
         if self.suite not in ("sparse", "dense"):
@@ -145,6 +147,9 @@ def build_funcs(cfg, test, deg):
         return [poly_from_terms(c, cfg.dim) for c in test]
     if cfg.suite == "sparse":
         return [MultiPower(c) for c in coeff_matrix(test, cfg.dim, deg)]
+    if cfg.zero_constant_term:
+        test = test.copy()
+        test[(slice(None),) + (0,) * cfg.dim] = 0
     return [MultiPower(c) for c in test]
 
 
