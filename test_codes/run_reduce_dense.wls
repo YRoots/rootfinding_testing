@@ -80,6 +80,7 @@ avgTimesFile = OpenAppend[FileNameJoin[{baseDir, "avg_times.txt"}]];
 numRootsFile = OpenAppend[FileNameJoin[{baseDir, "num_roots.txt"}]];  (* one line per degree: numTests ints *)
 
 (* --- Force consistent e-notation (ASCII) --- *)
+numFmt[x_ /; !NumericQ[x]] := "nan";  (* e.g. Indeterminate for a degree with no roots *)
 numFmt[x_] := Module[{m, e, mm},
   {m, e} = MantissaExponent[N[x, 50]];
   mm = ToString[NumberForm[m, {Infinity, 17}]];
