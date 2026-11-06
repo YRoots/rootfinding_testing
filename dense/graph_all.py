@@ -41,7 +41,7 @@ METRICS = {
 # One entry per method/solver.
 #
 #   "path"      template filled in with dim/arg; the default for the method
-#   "arg_paths" per-metric override, e.g. Bertini stores times as .npy
+#   "arg_paths" per-metric override, e.g. times stored as .npy
 #   "dim_paths" per-dimension override, e.g. NSolveValues used a different
 #               layout for the low dimensions
 #   "dims"      restricts a method to specific dimensions (e.g. Chebfun only
@@ -63,10 +63,7 @@ METHODS = {
         "color": "tab:purple",
     },
     "Bertini": {
-        "path": "results/bertini_results/dim{dim}_{arg}.txt",
-        "arg_paths": {
-            "avg_times": "results/bertini_results/dim{dim}_{arg}.npy",
-        },
+        "path": "results/bertini_results/v1.6/dim{dim}/{arg}.txt",
         "color": "tab:green",
     },
     "NSolveValues": {
