@@ -23,15 +23,22 @@ For every degree in [MINDEG, MAXDEG] it writes, under
 
     avg_times.txt        Bertini's own CPU time per system, averaged (see run_bertini)
     avg_wall_times.txt   wall-clock time per system, averaged, for reference
-    max_resids.txt       max |f_i(root)| over the real roots
+    max_resids.txt       max |f_i(root)| over the real roots in the box
     avg_resids.txt       mean |f_i(root)|
     sum_resids.txt       sum of |f_i(root)|
     roots/roots_deg{deg}.json
-                         {test number: real roots}, the same layout yroots and
-                         jroots write; coordinates in order (x0, ..., x{dim-1})
+                         {test number: real roots in the box}, the same layout
+                         yroots and jroots write; coordinates in order
+                         (x0, ..., x{dim-1})
     skipped_tests.txt    tests where Bertini produced no solution file
 
 Each summary file holds one value per line, in degree order.
+
+Bertini finds every real root, wherever it lies, but yroots, jroots and MTV only
+search the box [-1, 1]^dim. Roots outside the box (see DOMAIN_RADIUS) are left
+out of both the roots JSON and the residual summaries, so every method reports
+the same set of roots. Roots far outside the box are often very inaccurate and
+would otherwise dominate Bertini's residuals.
 
 Several copies can run at once (e.g. under nohup with different SUITE / dim
 settings): each run works in its own temporary directory, so they never share
@@ -66,6 +73,12 @@ zero_constant_term = True  # dense only: force the constant coefficient to 0
 # written to avg_times.txt) exceeds this many seconds. That degree is still
 # finished and saved; higher degrees are skipped. None = run up to maxdeg.
 max_avg_time = 100
+
+# Keep only real roots with max |x_i| <= DOMAIN_RADIUS + DOMAIN_TOL, the box
+# [-1, 1]^dim the other solvers search. DOMAIN_TOL = 0 matches compare_roots.py.
+# Set DOMAIN_RADIUS = None to keep every real root Bertini returns.
+DOMAIN_RADIUS = 1.0
+DOMAIN_TOL = 0.0
 
 # Bertini version tag: change this to "v1.6", "v1.7", etc.
 BERT_VERSION = "v1.6"
@@ -243,6 +256,15 @@ def read_bertini_solutions(path, nvars, imag_tol=None):
     return sols
 
 
+def in_box(roots):
+    """The roots with every coordinate inside [-DOMAIN_RADIUS, DOMAIN_RADIUS],
+    within DOMAIN_TOL. Keeps every root when DOMAIN_RADIUS is None."""
+    if DOMAIN_RADIUS is None:
+        return roots
+    return [r for r in roots
+            if all(abs(v) <= DOMAIN_RADIUS + DOMAIN_TOL for v in r)]
+
+
 def write_roots_json(path, roots_by_test):
     """Write {test number: list of roots}, one root per line, sorted by test number.
     Same layout as write_roots_json in run_yroots_combined.py."""
@@ -299,11 +321,13 @@ with open(skipped_log_path, "w") as skipped_log:
             sol_file = os.path.join(WORK_DIR, "real_finite_solutions")
 
             if os.path.exists(sol_file):
-                real_solutions = read_bertini_solutions(sol_file, dim, imag_tol=1e-12)
+                real_solutions = in_box(
+                    read_bertini_solutions(sol_file, dim, imag_tol=1e-12))
                 resids += get_resid(system, real_solutions)
 
-                # Every root Bertini classed as real (its own real/non-real test)
-                roots_by_test[test + 1] = read_bertini_solutions(sol_file, dim)
+                # Every root in the box Bertini classed as real (its own
+                # real/non-real test)
+                roots_by_test[test + 1] = in_box(read_bertini_solutions(sol_file, dim))
 
                 # Remove the individual solution file after consuming it
                 os.remove(sol_file)
