@@ -59,7 +59,7 @@ METHODS = {
         "color": "navy",
     },
     "MTV": {
-        "path": "results/telen_results/dim{dim}_{arg}.txt",
+        "path": "results/telen_results/dim{dim}/{arg}.txt",
         "color": "tab:purple",
     },
     "Bertini": {

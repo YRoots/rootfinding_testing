@@ -16,15 +16,22 @@ EigenvalueSolver is not in the General registry; install it once with
 The solver returns every root in C^dim, so after each solve the roots are filtered
 down to those that are real (max |imag| <= imag_tol) and lie in the closed box
 [-1, 1]^dim. For every degree in [mindeg, maxdeg] it solves num_tests systems and
-writes
+writes, under the run's base directory (``<result_dir>/dim{dim}/nonzero{nonzero}``
+for sparse, ``<result_dir>/dim{dim}`` for dense):
 
-    avg_times, max_resids, avg_resids, sum_resids   one value per degree
-    roots/roots_deg{deg}.json                       {test number: roots}
-    failed_tests.txt                                tests where the solver threw
+    avg_times.txt              average solve time, one value per degree
+    max_resids.txt             max |f_i(root)|, one value per degree
+    avg_resids.txt             mean |f_i(root)|, one value per degree
+    sum_resids.txt             sum of |f_i(root)|, one value per degree
+    roots/roots_deg{deg}.json  {test number: roots} for that degree
+    failed_tests.txt           tests where the solver threw
 
-Sparse runs write these under ``<result_dir>/dim{dim}/nonzero{nonzero}/``. Dense
-runs write the summaries as ``<result_dir>/dim{dim}_{name}.txt``, where
-dense/graph_all.py reads them, and the roots under ``<result_dir>/dim{dim}/roots/``.
+This is the same layout run_yroots_combined.py and run_jroots_combined.jl use: the
+.txt files hold one plain value per line in degree order, and the JSON files match
+theirs, so the results can be diffed directly.
+
+With max_avg_time set, the run stops after the first degree whose average solve
+time exceeds it (that degree is still saved), as run_bertini_combined.py does.
 """
 
 using EigenvalueSolver
@@ -43,7 +50,7 @@ const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 # ----------------------------------------------------------------------------
 
 Base.@kwdef mutable struct Config
-    suite::String = "sparse"           # "sparse" | "dense"
+    suite::String = "dense"           # "sparse" | "dense"
     dim::Int = 5
     mindeg::Int = 2
     maxdeg::Int = 10
@@ -54,9 +61,17 @@ Base.@kwdef mutable struct Config
     append::Bool = false               # true to add degrees to an existing run
     warmup::Int = 10                   # untimed solves at mindeg to absorb JIT cost
     imag_tol::Union{Float64,Nothing} = nothing   # defaults: 1e-13 sparse, 1e-14 dense
-    blas_threads::Int = 40             # the solver's linear algebra runs on BLAS threads
+    blas_threads::Int = 1             # the solver's linear algebra runs on BLAS threads
     zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0,
                                        # as the MTV/Bertini/Chebfun/NSolve dense runs do
+    # Stop early once a degree's average solve time (the value written to
+    # avg_times) exceeds this many seconds. That degree is still finished and
+    # saved; higher degrees are skipped. nothing = run up to maxdeg.
+    max_avg_time::Union{Float64,Nothing} = 100
+    # EigenvalueSolver has hard-coded @time calls that print a line per step of
+    # every solve (verbose=false doesn't stop them). true sends the solver's
+    # stdout to devnull; false shows them.
+    quiet_solver::Bool = true
 end
 
 """Fill in the per-suite defaults and validate."""
@@ -66,7 +81,7 @@ function resolve!(cfg::Config)
         cfg.coeff_dir = cfg.suite == "sparse" ? "../sparse/coeffs" : "../dense/coeffs"
     end
     if cfg.result_dir === nothing
-        cfg.result_dir = "../$(cfg.suite)/results/telen_results"
+        cfg.result_dir = "../$(cfg.suite)/results/telen_results_new"
     end
     if cfg.imag_tol === nothing
         cfg.imag_tol = cfg.suite == "sparse" ? 1e-13 : 1e-14
@@ -80,12 +95,7 @@ function base_dir(cfg::Config)
     return cfg.suite == "sparse" ? joinpath(d, "nonzero$(cfg.nonzero)") : d
 end
 
-function summary_path(cfg::Config, name)
-    if cfg.suite == "sparse"
-        return joinpath(base_dir(cfg), "$(name).txt")
-    end
-    return joinpath(cfg.result_dir, "dim$(cfg.dim)_$(name).txt")
-end
+summary_path(cfg::Config, name) = joinpath(base_dir(cfg), "$(name).txt")
 
 roots_path(cfg::Config, deg) = joinpath(base_dir(cfg), "roots", "roots_deg$(deg).json")
 
@@ -170,6 +180,12 @@ end
 
 """Solve one system, returning every root the solver found and the elapsed seconds."""
 function solve_test(cfg::Config, f, x)
+    cfg.quiet_solver || return _solve_test(cfg, f, x)
+    # The redirect happens outside the solver's @timed, so it isn't timed.
+    return redirect_stdout(() -> _solve_test(cfg, f, x), devnull)
+end
+
+function _solve_test(cfg::Config, f, x)
     if cfg.suite == "sparse"
         ans = @timed EigenvalueSolver.solve_CI_mixed(f, x)
         return ans.value[1], ans.time
@@ -308,6 +324,14 @@ function run_benchmark(cfg::Config)
         append_value(summary_paths["max_resids"], safe(maximum, all_res))
         append_value(summary_paths["avg_resids"], safe(mean, all_res))
         append_value(summary_paths["sum_resids"], safe(sum, all_res))
+
+        avg_time = safe(mean, times)
+        @printf("deg %d: avg solve time %.4g s\n", deg, avg_time)
+        if cfg.max_avg_time !== nothing && deg < cfg.maxdeg && avg_time > cfg.max_avg_time
+            @printf("Stopping: deg %d averaged %.4g s per system, over max_avg_time = %g s. Degrees %d-%d skipped.\n",
+                    deg, avg_time, cfg.max_avg_time, deg + 1, cfg.maxdeg)
+            break
+        end
     end
 
     println("Program Finished")
