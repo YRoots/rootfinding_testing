@@ -172,7 +172,17 @@ def _close(a, b):
     return all(abs(x - y) <= TOL for x, y in zip(a, b))
 
 
-def degree_status(roots_by_method):
+def select_tests(tests, which):
+    """Filter test numbers by `which`: None = all, an int N = tests 1..N,
+    or any collection of test numbers (e.g. range(1, 51), [3, 7, 12])."""
+    if which is None:
+        return set(tests)
+    if isinstance(which, int):
+        return {t for t in tests if 1 <= t <= which}
+    return set(tests) & set(which)
+
+
+def degree_status(roots_by_method, tests=None):
     """
     roots_by_method: {method: {test: [roots]}} for one dim/degree.
     Returns {method: {"tests": n, "missed": k, "spurious": k, "bad": k}},
@@ -180,7 +190,8 @@ def degree_status(roots_by_method):
     """
     status = {m: {"tests": 0, "missed": 0, "spurious": 0, "bad": 0}
               for m in roots_by_method}
-    all_tests = set().union(*(set(d) for d in roots_by_method.values()))
+    all_tests = select_tests(
+        set().union(*(set(d) for d in roots_by_method.values())), tests)
     for test in all_tests:
         present = [m for m, d in roots_by_method.items() if test in d]
         if len(present) < MIN_SOLVERS_PER_TEST:
@@ -212,11 +223,13 @@ def degree_status(roots_by_method):
     return status
 
 
-def root_status(roots_dirs, dim, degrees, reversed_methods=(), groups=None):
+def root_status(roots_dirs, dim, degrees, reversed_methods=(), groups=None,
+                tests=None):
     """
     roots_dirs: {method: roots directory for this dim}.
     groups: optional {method: group name}; methods only vote with others in
     the same group. Methods not listed share the default group.
+    tests: which tests to check, see select_tests (None = all).
     Returns {method: {deg: status dict}} for every degree where the method
     had roots and was judged against at least one other method.
     """
@@ -231,7 +244,7 @@ def root_status(roots_dirs, dim, degrees, reversed_methods=(), groups=None):
         for group in loaded.values():
             if len(group) < MIN_SOLVERS_PER_TEST:
                 continue
-            for m, s in degree_status(group).items():
+            for m, s in degree_status(group, tests).items():
                 if s["tests"]:
                     out[m][deg] = s
     return out

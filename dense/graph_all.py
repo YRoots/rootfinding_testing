@@ -164,6 +164,12 @@ METHODS_ENABLED = {
 # none saved for dense.
 SHOW_ROOT_MARKERS = True
 
+# Which tests to check, per dim/degree:
+#   None              every test that has results
+#   100               tests 1-100
+#   range(1, 51)      tests 1-50 (any list/range of test numbers works)
+ROOT_TESTS = None
+
 
 # ----------------------------------------------------------------------
 # CORE LOGIC
@@ -214,7 +220,8 @@ def compute_root_status(dim, max_deg):
                         if configs[label].get("roots_reversed")}
     groups = {label: configs[label].get("roots_group") for label in roots_dirs}
     return root_accuracy.root_status(
-        roots_dirs, dim, range(MIN_DEGREE, max_deg + 1), reversed_methods, groups)
+        roots_dirs, dim, range(MIN_DEGREE, max_deg + 1), reversed_methods, groups,
+        tests=ROOT_TESTS)
 
 
 def plot_metric(dim, arg, max_deg, root_status=None):
