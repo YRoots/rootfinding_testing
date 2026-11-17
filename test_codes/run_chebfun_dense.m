@@ -1,63 +1,56 @@
-addpath('chebfun');
+% Benchmark Chebfun2 on the dense test suite (dim 2 only).
+%
+% Run from test_codes/. Writes, under ../dense/results/chebfun_results/dim2:
+%   avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
+%                              one value per line, one line per degree
+%   num_roots.txt              one line per degree: numTests root counts
+%   roots/roots_deg{deg}.json  {test number: [roots]}, same layout as yroots/jroots
+%
+% Like every dense run, the constant coefficient is set to 0.
+% Coefficient M(i,j) multiplies y^(i-1) * x^(j-1), i.e. the tensor's first
+% axis is the *second* chebfun variable, so roots are stored as (x2, x1)
+% (graph_all.py marks this "roots_reversed"), matching the Mathematica runs.
+
+addpath('../chebfun');
 cheb.xy;
 
-% User‐configurable parameters
+% User-configurable parameters
 dim       = 2;
-nonZero   = 3;
 numTests  = 300;
-
-minDeg    = 26;
+minDeg    = 2;
 maxDeg    = 50;
-batch_num = 2;
 
-% === Directory layout (with batch_num in summary files) ===
-baseDir = sprintf("chebfun_results/dim%d/nonzero%d", dim, nonZero);
-if ~exist(baseDir, 'dir'), mkdir(baseDir); end
+baseDir  = sprintf("../dense/results/chebfun_results/dim%d", dim);
+rootsDir = fullfile(baseDir, "roots");
+if ~exist(rootsDir, 'dir'), mkdir(rootsDir); end
 
-% Open summary files in append mode (per batch_num)
-time_fid    = fopen(fullfile(baseDir, sprintf("avg_times_%d.txt",   batch_num)), 'a');
-avg_res_fid = fopen(fullfile(baseDir, sprintf("avg_resids_%d.txt",  batch_num)), 'a');
-max_res_fid = fopen(fullfile(baseDir, sprintf("max_resids_%d.txt",  batch_num)), 'a');
-sum_res_fid = fopen(fullfile(baseDir, sprintf("sum_resids_%d.txt",  batch_num)), 'a');
-num_roots_fid = fopen(fullfile(baseDir, sprintf("num_roots_%d.txt", batch_num)), 'a');
+% Summary files: overwritten each run, one line appended per degree
+time_fid      = fopen(fullfile(baseDir, "avg_times.txt"),  'w');
+avg_res_fid   = fopen(fullfile(baseDir, "avg_resids.txt"), 'w');
+max_res_fid   = fopen(fullfile(baseDir, "max_resids.txt"), 'w');
+sum_res_fid   = fopen(fullfile(baseDir, "sum_resids.txt"), 'w');
+num_roots_fid = fopen(fullfile(baseDir, "num_roots.txt"),  'w');
 
 for deg = minDeg:maxDeg
-    % Per-degree dir (for per-test roots)
-    degDir = fullfile(baseDir, sprintf("deg%d", deg));
-    if ~exist(degDir, 'dir'), mkdir(degDir); end
+    % Same Mathematica-JSON coefficients the yroots/jroots/NSolve dense runs read
+    coeffFile = sprintf("../dense/coeffs_mathematica_json/dim%d_deg%d_randn.txt", dim, deg);
+    fprintf("Reading %s\n", coeffFile);
+    A = jsondecode(fileread(coeffFile));   % numTests x dim x (deg+1) x (deg+1)
+    reps = min(numTests, size(A,1));
 
-    % Load coefficients
-    coeffFile = sprintf("mathematica_coeffs/dim%d/deg%d/num%d.txt", dim, deg, nonZero);
-    txt = fileread(coeffFile);
+    all_times     = nan(1, reps);
+    all_resids    = [];
+    all_num_roots = zeros(1, reps);
+    roots_by_test = cell(1, reps);
 
-    % === Cleanup ===
-    txt = replace(txt, "][", " ");
-    txt = replace(txt, ["[", "]"], "");
-    txt = replace(txt, ",", " ");
-    tok = split(strtrim(txt));
-    A   = str2double(tok);
-    assert(~any(isnan(A)), "Found NaNs in A—text parsing went awry!");
+    for test = 1:reps
+        F_coeffs = reshape(A(test, 1, :, :), deg+1, deg+1);
+        G_coeffs = reshape(A(test, 2, :, :), deg+1, deg+1);
+        F_coeffs(1,1) = 0;   % zero constant term
+        G_coeffs(1,1) = 0;
 
-    blockSize  = dim * (deg+1)^dim;
-    all_times  = nan(1, numTests);
-    all_resids = [];
-    all_num_roots = zeros(1, numTests);
-
-    for test = 1:numTests
-        baseIdx = (test-1) * blockSize;
-        B = A(baseIdx + (1:(deg+1)^dim));
-        C = A(baseIdx + (deg+1)^dim + (1:(deg+1)^dim));
-
-        % Build F, G
-        F = @(x,y) 0;  G = @(x,y) 0;
-        for i = 1:(deg+1)
-            for j = 1:(deg+2-i)
-                idx = (i-1)*(deg+1) + j;
-                Fprev = F; Gprev = G;
-                F = @(x,y) Fprev(x,y) + B(idx) * y.^(i-1) .* x.^(j-1);
-                G = @(x,y) Gprev(x,y) + C(idx) * y.^(i-1) .* x.^(j-1);
-            end
-        end
+        F = @(x,y) evalDense2D(F_coeffs, x, y);
+        G = @(x,y) evalDense2D(G_coeffs, x, y);
 
         try
             tStart = tic;
@@ -68,52 +61,26 @@ for deg = minDeg:maxDeg
             roots_ = zeros(0,2); % no roots recorded
         end
 
-        % Residuals and root count
         for k = 1:size(roots_,1)
-            all_resids(end+1) = abs(F(roots_(k,1), roots_(k,2)));
-            all_resids(end+1) = abs(G(roots_(k,1), roots_(k,2)));
+            all_resids(end+1) = abs(F(roots_(k,1), roots_(k,2))); %#ok<AGROW>
+            all_resids(end+1) = abs(G(roots_(k,1), roots_(k,2))); %#ok<AGROW>
         end
         all_num_roots(test) = size(roots_,1);
-
-        % Write roots for this test to .../deg{deg}/roots_test{test}.txt
-        rootFile = fullfile(degDir, sprintf("roots_test%d.txt", test));
-        fid = fopen(rootFile, 'a'); % append mode per test
-        if fid < 0
-            warning("Could not open %s for appending.", rootFile);
-        else
-            if ~isempty(roots_)
-                for k = 1:size(roots_,1)
-                    fprintf(fid, '%.17g %.17g\n', roots_(k,1), roots_(k,2));
-                end
-            else
-                fprintf(fid, "# (no roots)\n");
-            end
-            fclose(fid);
-        end
+        roots_by_test{test} = roots_;
 
         if mod(test,10) == 0
-            fprintf("deg %d: %d/%d tests completed\n", deg, test, numTests);
+            fprintf("deg %d: %d/%d tests completed\n", deg, test, reps);
         end
     end
 
-    % ---- Per-degree summaries (append one line to each file) ----
-    valid = ~isnan(all_times);
-    perDegTime = mean(all_times(valid));
-    perDegAvg  = mean(all_resids);
-    perDegMax  = max(all_resids);
-    perDegSum  = sum(all_resids);
+    writeRootsJSON(fullfile(rootsDir, sprintf("roots_deg%d.json", deg)), roots_by_test);
 
-    fprintf(time_fid,    '%.17g\n', perDegTime);
-    fprintf(avg_res_fid, '%.17g\n', perDegAvg);
-    fprintf(max_res_fid, '%.17g\n', perDegMax);
-    fprintf(sum_res_fid, '%.17g\n', perDegSum);
-
-    % num_roots: one line per degree with numTests integers
-    fprintf(num_roots_fid, '%d', all_num_roots(1));
-    for t = 2:numTests
-        fprintf(num_roots_fid, ' %d', all_num_roots(t));
-    end
-    fprintf(num_roots_fid, '\n');
+    % ---- Per-degree summaries ----
+    fprintf(time_fid,    '%.17g\n', mean(all_times(~isnan(all_times))));
+    fprintf(avg_res_fid, '%.17g\n', mean(all_resids));
+    fprintf(max_res_fid, '%.17g\n', max([all_resids, NaN]));
+    fprintf(sum_res_fid, '%.17g\n', sum(all_resids));
+    fprintf(num_roots_fid, '%s\n', strjoin(string(all_num_roots), ' '));
 end
 
 fclose(time_fid);
@@ -123,3 +90,35 @@ fclose(sum_res_fid);
 fclose(num_roots_fid);
 
 exit;
+
+% ---- helper functions ----
+function val = evalDense2D(M, x, y)
+    % M(i,j) multiplies y^(i-1) * x^(j-1); elementwise in x and y
+    val = zeros(size(x));
+    [I, J, c] = find(M);
+    for k = 1:numel(c)
+        val = val + c(k) .* (y.^(I(k)-1)) .* (x.^(J(k)-1));
+    end
+end
+
+function writeRootsJSON(path, roots_by_test)
+    % {test number: [roots]}, one root per line, as run_yroots_combined.py writes
+    fid = fopen(path, 'w');
+    fprintf(fid, "{\n");
+    n = numel(roots_by_test);
+    for t = 1:n
+        R = roots_by_test{t};
+        if isempty(R)
+            fprintf(fid, '  "%d": []', t);
+        else
+            rows = strings(size(R,1), 1);
+            for k = 1:size(R,1)
+                rows(k) = "    [" + strjoin(compose("%.17g", R(k,:)), ",") + "]";
+            end
+            fprintf(fid, '  "%d": [\n%s\n  ]', t, strjoin(rows, sprintf(",\n")));
+        end
+        if t < n, fprintf(fid, ",\n"); else, fprintf(fid, "\n"); end
+    end
+    fprintf(fid, "}\n");
+    fclose(fid);
+end

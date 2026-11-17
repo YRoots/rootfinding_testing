@@ -1,48 +1,53 @@
+% Benchmark Chebfun2 on the sparse test suite (dim 2 only).
+%
+% Run from test_codes/. Writes, under
+% ../sparse/results/chebfun_results/dim2/nonzero{nonZero}:
+%   avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
+%                              one value per line, one line per degree
+%   num_roots.txt              one line per degree: numTests root counts
+%   roots/roots_deg{deg}.json  {test number: [roots]}, same layout as yroots/jroots
+%
+% Each sparse term row is [x_exp, y_exp, coeff], so roots are stored in the
+% natural (x1, x2) order, like yroots (not "roots_reversed" in graph_all.py).
+
 addpath('../chebfun');
 cheb.xy;
 
-% User‐configurable parameters
+% User-configurable parameters
 dim       = 2;
 nonZero   = 3;
 numTests  = 100;
-
 minDeg    = 2;
 maxDeg    = 30;
 
-% === Directory layout (with batch_num in summary files) ===
-baseDir = sprintf("../sparse/results/chebfun_results/dim%d/nonzero%d", dim, nonZero);
-if ~exist(baseDir, 'dir'), mkdir(baseDir); end
+baseDir  = sprintf("../sparse/results/chebfun_results/dim%d/nonzero%d", dim, nonZero);
+rootsDir = fullfile(baseDir, "roots");
+if ~exist(rootsDir, 'dir'), mkdir(rootsDir); end
 
-% Open summary files in append mode
-time_fid    = fopen(fullfile(baseDir, "avg_times.txt"), 'w');
-avg_res_fid = fopen(fullfile(baseDir, "avg_resids.txt"), 'w');
-max_res_fid = fopen(fullfile(baseDir, "max_resids.txt"), 'w');
-sum_res_fid = fopen(fullfile(baseDir, "sum_resids.txt"), 'w');
-num_roots_fid = fopen(fullfile(baseDir, "num_roots.txt"), 'w');
+% Summary files: overwritten each run, one line appended per degree
+time_fid      = fopen(fullfile(baseDir, "avg_times.txt"),  'w');
+avg_res_fid   = fopen(fullfile(baseDir, "avg_resids.txt"), 'w');
+max_res_fid   = fopen(fullfile(baseDir, "max_resids.txt"), 'w');
+sum_res_fid   = fopen(fullfile(baseDir, "sum_resids.txt"), 'w');
+num_roots_fid = fopen(fullfile(baseDir, "num_roots.txt"),  'w');
 
 for deg = minDeg:maxDeg
-    % Per-degree dir (for per-test roots)
-    degDir = fullfile(baseDir, sprintf("deg%d", deg));
-    if ~exist(degDir, 'dir'), mkdir(degDir); end
-
-    % Load coefficients
     coeffFile = sprintf("../sparse/coeffs_mathematica_json/dim%d/deg%d/num%d.txt", dim, deg, nonZero);
-    txt = fileread(coeffFile);
-    A = jsondecode(txt);
+    fprintf("Reading %s\n", coeffFile);
+    A = jsondecode(fileread(coeffFile));   % numTests x dim x (nonZero+1) x (dim+1)
+    reps = min(numTests, size(A,1));
 
-    numTests = min(numTests, size(A,1));
+    all_times     = nan(1, reps);
+    all_resids    = [];
+    all_num_roots = zeros(1, reps);
+    roots_by_test = cell(1, reps);
 
-    all_times  = nan(1, numTests);
-    all_resids = [];
-    all_num_roots = zeros(1, numTests);
+    for test = 1:reps
+        F_terms = reshape(A(test, 1, :, :), size(A,3), size(A,4));
+        G_terms = reshape(A(test, 2, :, :), size(A,3), size(A,4));
 
-    for test = 1:numTests
-        F_coeffs = squeeze(A(test, 1, :, :));
-        G_coeffs = squeeze(A(test, 2, :, :));
-
-        % Create evaluators (support scalar or array x,y; elementwise)
-        F = @(x,y) evalSparse2D(F_coeffs, x, y);
-        G = @(x,y) evalSparse2D(G_coeffs, x, y);
+        F = @(x,y) evalSparse2D(F_terms, x, y);
+        G = @(x,y) evalSparse2D(G_terms, x, y);
 
         try
             tStart = tic;
@@ -53,52 +58,26 @@ for deg = minDeg:maxDeg
             roots_ = zeros(0,2); % no roots recorded
         end
 
-        % Residuals and root count
         for k = 1:size(roots_,1)
-            all_resids(end+1) = abs(F(roots_(k,1), roots_(k,2)));
-            all_resids(end+1) = abs(G(roots_(k,1), roots_(k,2)));
+            all_resids(end+1) = abs(F(roots_(k,1), roots_(k,2))); %#ok<AGROW>
+            all_resids(end+1) = abs(G(roots_(k,1), roots_(k,2))); %#ok<AGROW>
         end
         all_num_roots(test) = size(roots_,1);
-
-        % Write roots for this test to .../deg{deg}/roots_test{test}.txt
-        rootFile = fullfile(degDir, sprintf("roots_test%d.txt", test));
-        fid = fopen(rootFile, 'a'); % append mode per test
-        if fid < 0
-            warning("Could not open %s for appending.", rootFile);
-        else
-            if ~isempty(roots_)
-                for k = 1:size(roots_,1)
-                    fprintf(fid, '%.17g %.17g\n', roots_(k,1), roots_(k,2));
-                end
-            else
-                fprintf(fid, "# (no roots)\n");
-            end
-            fclose(fid);
-        end
+        roots_by_test{test} = roots_;
 
         if mod(test,10) == 0
-            fprintf("deg %d: %d/%d tests completed\n", deg, test, numTests);
+            fprintf("deg %d: %d/%d tests completed\n", deg, test, reps);
         end
     end
 
-    % ---- Per-degree summaries (append one line to each file) ----
-    valid = ~isnan(all_times);
-    perDegTime = mean(all_times(valid));
-    perDegAvg  = mean(all_resids);
-    perDegMax  = max(all_resids);
-    perDegSum  = sum(all_resids);
+    writeRootsJSON(fullfile(rootsDir, sprintf("roots_deg%d.json", deg)), roots_by_test);
 
-    fprintf(time_fid,    '%.17g\n', perDegTime);
-    fprintf(avg_res_fid, '%.17g\n', perDegAvg);
-    fprintf(max_res_fid, '%.17g\n', perDegMax);
-    fprintf(sum_res_fid, '%.17g\n', perDegSum);
-
-    % num_roots: one line per degree with numTests integers
-    fprintf(num_roots_fid, '%d', all_num_roots(1));
-    for t = 2:numTests
-        fprintf(num_roots_fid, ' %d', all_num_roots(t));
-    end
-    fprintf(num_roots_fid, '\n');
+    % ---- Per-degree summaries ----
+    fprintf(time_fid,    '%.17g\n', mean(all_times(~isnan(all_times))));
+    fprintf(avg_res_fid, '%.17g\n', mean(all_resids));
+    fprintf(max_res_fid, '%.17g\n', max([all_resids, NaN]));
+    fprintf(sum_res_fid, '%.17g\n', sum(all_resids));
+    fprintf(num_roots_fid, '%s\n', strjoin(string(all_num_roots), ' '));
 end
 
 fclose(time_fid);
@@ -109,16 +88,33 @@ fclose(num_roots_fid);
 
 exit;
 
-% ---- helper function ----
+% ---- helper functions ----
 function val = evalSparse2D(T, x, y)
-    % T: nTerms x 3, columns are [x_exp, y_exp, coeff]
-    xe = T(:,1);
-    ye = T(:,2);
-    c  = T(:,3);
-
-    % elementwise evaluation, same size output as x and y
+    % T: nTerms x 3, columns are [x_exp, y_exp, coeff]; elementwise in x and y
     val = zeros(size(x));
-    for k = 1:numel(c)
-        val = val + c(k) .* (x.^xe(k)) .* (y.^ye(k));
+    for k = 1:size(T,1)
+        val = val + T(k,3) .* (x.^T(k,1)) .* (y.^T(k,2));
     end
+end
+
+function writeRootsJSON(path, roots_by_test)
+    % {test number: [roots]}, one root per line, as run_yroots_combined.py writes
+    fid = fopen(path, 'w');
+    fprintf(fid, "{\n");
+    n = numel(roots_by_test);
+    for t = 1:n
+        R = roots_by_test{t};
+        if isempty(R)
+            fprintf(fid, '  "%d": []', t);
+        else
+            rows = strings(size(R,1), 1);
+            for k = 1:size(R,1)
+                rows(k) = "    [" + strjoin(compose("%.17g", R(k,:)), ",") + "]";
+            end
+            fprintf(fid, '  "%d": [\n%s\n  ]', t, strjoin(rows, sprintf(",\n")));
+        end
+        if t < n, fprintf(fid, ",\n"); else, fprintf(fid, "\n"); end
+    end
+    fprintf(fid, "}\n");
+    fclose(fid);
 end

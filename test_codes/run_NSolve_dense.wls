@@ -1,7 +1,16 @@
 Off[Reduce::ratnz];
 Off[Set::shape];
 
-(* CLI: wolframscript -file filename dim minDeg maxDeg nonzero numTests *)
+(* CLI: wolframscript -file run_NSolve_dense.wls dim minDeg maxDeg nonzero numTests
+   (nonzero is accepted for a uniform command line but unused by the dense suite)
+
+   Writes, under ../dense/results/NSolveValues_results/dim{dim}:
+     avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
+                                one value per line, one line per degree
+     num_roots.txt              one line per degree: numTests root counts
+     roots/roots_deg{deg}.json  {test number: [roots]}, same layout as yroots/jroots
+   Roots are stored as (xd, ..., x1): useTensor maps the coefficient tensor's
+   first axis to the last variable (graph_all.py marks this "roots_reversed"). *)
 dim      = ToExpression[$ScriptCommandLine[[2]]];
 minDeg   = ToExpression[$ScriptCommandLine[[3]]];
 maxDeg   = ToExpression[$ScriptCommandLine[[4]]];
@@ -9,9 +18,9 @@ nonzero  = ToExpression[$ScriptCommandLine[[5]]];
 numTests = ToExpression[$ScriptCommandLine[[6]]];
 
 Print["Parameters: dim=", dim, ", degrees=", minDeg, " to ", maxDeg,
-      ", nonzero=", nonzero, ", tests=", numTests];
+      ", tests=", numTests];
 
-(* Higher precision for improved accuracy in solves/residuals *)
+(* Working precision passed to NSolveValues *)
 wp = 15;
 
 (* Variables & function symbols *)
@@ -47,9 +56,7 @@ appendResiduals[roots_List] := Module[{val},
   Do[
     With[{root = roots[[k]]},
       Do[
-        (* Guard against any accidental list-valued return; force scalar *)
         val = N[Abs[ myFuncs[[j]][root] ]];
-        (*val = If[ListQ[val], Mean[Flatten[val]], val];*)
         allResids = Append[allResids, val],
         {j, 1, dim}
       ]
@@ -58,33 +65,9 @@ appendResiduals[roots_List] := Module[{val},
   ];
 ];
 
-(* Base dir *)
-baseDir = FileNameJoin[{
-  "..",
-  "dense",
-  "results",
-  "NSolveValues_results",
-  "dim" <> ToString[dim]
-}];
-CreateDirectory[baseDir, CreateIntermediateDirectories -> True];
-
-rootsFileForTest[deg_, t_] := Module[{dir, file},
-  dir = FileNameJoin[{baseDir, "deg" <> ToString[deg]}];
-  If[!DirectoryQ[dir], CreateDirectory[dir, CreateIntermediateDirectories -> True]];
-  file = FileNameJoin[{dir, "roots_test" <> ToString[t] <> ".txt"}];
-  file
-]
-
-(* Summary files (append one per-degree line to each) *)
-maxResidFile = OpenWrite[FileNameJoin[{baseDir, "max_resids.txt"}]];
-avgResidFile = OpenWrite[FileNameJoin[{baseDir, "avg_resids.txt"}]];
-sumResidFile = OpenWrite[FileNameJoin[{baseDir, "sum_resids.txt"}]];
-avgTimesFile = OpenWrite[FileNameJoin[{baseDir, "avg_times.txt"}]];
-numRootsFile = OpenWrite[FileNameJoin[{baseDir, "num_roots.txt"}]];  (* one line per degree: numTests ints *)
-
-(* --- Force consistent one-line e-notation (ASCII), as in run_reduce_*.wls ---
+(* --- Number formatting ---
    ToString[NumberForm[...]] alone writes small numbers in the two-line
-   "mantissa x 10 / exponent" display form, which then reads back as garbage. *)
+   "mantissa x 10 / exponent" display form, so force one-line e-notation. *)
 numFmt[x_ /; !NumericQ[x]] := "nan";  (* e.g. Indeterminate for a degree with no roots *)
 numFmt[x_] := Module[{m, e, mm},
   {m, e} = MantissaExponent[N[x, 50]];
@@ -92,50 +75,74 @@ numFmt[x_] := Module[{m, e, mm},
   mm <> "e" <> ToString[e]
 ];
 
+(* JSON number: like numFmt, but 0 must be written as a valid literal *)
+jsonNum[x_] := Module[{v = N[x], m, e},
+  If[v == 0, Return["0.0"]];
+  {m, e} = MantissaExponent[v];
+  ToString[NumberForm[m, {Infinity, 17}]] <> "e" <> ToString[e]
+];
+
+(* {test number: [roots]}, one root per line, as run_yroots_combined.py writes *)
+writeRootsJSON[path_, rootsByTest_List] := Module[{strm, n = Length[rootsByTest], rs},
+  strm = OpenWrite[path];
+  WriteString[strm, "{\n"];
+  Do[
+    rs = rootsByTest[[t]];
+    WriteString[strm, "  \"", ToString[t], "\": ",
+      If[rs === {}, "[]",
+        "[\n" <> StringRiffle[
+          ("    [" <> StringRiffle[jsonNum /@ #, ","] <> "]") & /@ rs, ",\n"] <> "\n  ]"],
+      If[t < n, ",\n", "\n"]],
+    {t, 1, n}
+  ];
+  WriteString[strm, "}\n"];
+  Close[strm];
+];
+
+(* Output dirs *)
+baseDir  = FileNameJoin[{"..", "dense", "results", "NSolveValues_results",
+                         "dim" <> ToString[dim]}];
+rootsDir = FileNameJoin[{baseDir, "roots"}];
+CreateDirectory[rootsDir, CreateIntermediateDirectories -> True];
+
+(* Summary files: overwritten each run, one line appended per degree *)
+maxResidFile = OpenWrite[FileNameJoin[{baseDir, "max_resids.txt"}]];
+avgResidFile = OpenWrite[FileNameJoin[{baseDir, "avg_resids.txt"}]];
+sumResidFile = OpenWrite[FileNameJoin[{baseDir, "sum_resids.txt"}]];
+avgTimesFile = OpenWrite[FileNameJoin[{baseDir, "avg_times.txt"}]];
+numRootsFile = OpenWrite[FileNameJoin[{baseDir, "num_roots.txt"}]];
+
 For[deg = minDeg, deg <= maxDeg, deg++,
 
   readFileName = FileNameJoin[{
-    "..",
-    "dense",
-    "coeffs_mathematica_json",
+    "..", "dense", "coeffs_mathematica_json",
     "dim" <> ToString[dim] <> "_deg" <> ToString[deg] <> "_randn.txt"
   }];
   Print["Reading ", readFileName];
 
-  (* read as high-precision numbers to avoid downshifting during build *)
-  data = Import[readFileName, "JSON"];  (* shape: {numTests, dim, deg+1, deg+1} *)
+  data = Import[readFileName, "JSON"];  (* shape: {numTests, dim, deg+1, ..., deg+1} *)
   If[!ListQ[data], Print["[error] Could not parse JSON: ", readFileName]; Exit[1]];
 
   (* Per-degree accumulators *)
   allTimes = {};
   allResids = {};
   allNumRoots = {};
+  rootsByTest = {};
 
-  For[test = 1, test <= numTests, test++,
+  For[test = 1, test <= Min[numTests, Length[data]], test++,
     solveFuncs = {};
 
     For[i = 1, i <= dim, i++,
-      (* High-precision coefficients for Fi at this test *)
-      coeffMat = data[[test, i]];
+      coeffsSolve = Flatten[data[[test, i]]];
 
-      coeffsSolve   = Flatten[coeffMat];
-
-      (* Set constant coeff to 0 *)
+      (* Set constant coeff to 0, as every dense run does *)
       coeffsSolve[[1]] = 0;
 
-      (* Scale to improve conditioning; roots unchanged *)
-      (*scale = Max[1, Max[Abs[coeffsOrig]]];
-      coeffsSolve  = coeffsOrig/scale;*)
+      polyExpr = Block[{coeffs = coeffsSolve}, Catch[useTensor[dim, {}]] ];
 
-      (* Build both: original (for residuals) and scaled (for solving) *)
-      polyExprOrig  = Block[{coeffs = coeffsSolve},  Catch[useTensor[dim, {}]] ];
-      polyExprSolve = Block[{coeffs = coeffsSolve}, Catch[useTensor[dim, {}]] ];
-
-      (* numeric evaluator for ORIGINAL polynomial: F_i[{x1,..,xd}] -> number *)
-      (*myFuncs[[i]] =.; *) (* unset prior definitions safely *)
-      myFuncs[[i]][myVars] := Evaluate[polyExprOrig];
-      (* expression used in NSolveValues (SCALED) *)
-      solveFuncs = Append[solveFuncs, polyExprSolve == 0];
+      (* numeric evaluator: F_i[{x1,..,xd}] -> number *)
+      myFuncs[[i]][myVars] := Evaluate[polyExpr];
+      solveFuncs = Append[solveFuncs, polyExpr == 0];
     ];
 
     {timeVal, solList} = AbsoluteTiming @ NSolveValues[
@@ -143,28 +150,19 @@ For[deg = minDeg, deg <= maxDeg, deg++,
       vars, Reals,
       WorkingPrecision -> wp
     ];
-    (* numeric list at high precision, then dedup *)
     solList = N[DeleteDuplicates[solList]];
     appendResiduals[solList];
 
     allTimes    = Append[allTimes, timeVal];
     allNumRoots = Append[allNumRoots, Length[solList]];
-
-    (* Append roots for this test, grouped by degree *)
-    rfile = rootsFileForTest[deg, test];
-    strm  = OpenWrite[rfile];
-    WriteString[strm, "# Degree ", ToString[deg], "\n"];
-    If[Length[solList] > 0,
-      Scan[(WriteString[strm, StringRiffle[numFmt /@ #, " "], "\n"]) &, solList],
-      WriteString[strm, "# (no roots)\n"]
-    ];
-    Close[strm];
+    rootsByTest = Append[rootsByTest, solList];
 
     If[Mod[test, 10] == 0, Print["deg ", deg, ", test ", test, "/", numTests]];
   ];
 
-  (* ---- Per-degree summaries ---- *)
-  (* Max/avg over ALL equations & ALL roots; single numbers per degree *)
+  writeRootsJSON[FileNameJoin[{rootsDir, "roots_deg" <> ToString[deg] <> ".json"}], rootsByTest];
+
+  (* ---- Per-degree summaries over ALL equations & ALL roots ---- *)
   perDegMax  = If[allResids === {}, Indeterminate, Max @ Flatten @ allResids];
   perDegAvg  = If[allResids === {}, Indeterminate, Mean @ Flatten @ allResids];
   perDegSum  = If[allResids === {}, Indeterminate, Total @ Flatten @ allResids];
@@ -174,13 +172,9 @@ For[deg = minDeg, deg <= maxDeg, deg++,
   WriteString[avgResidFile,  numFmt[perDegAvg],  "\n"];
   WriteString[sumResidFile,  numFmt[perDegSum],  "\n"];
   WriteString[avgTimesFile,  numFmt[perDegTime], "\n"];
-
-  (* ---- num_roots: append one line with counts for this degree ---- *)
   WriteString[numRootsFile, StringRiffle[ToString /@ allNumRoots, " "], "\n"];
 ];
 
 Close /@ {maxResidFile, avgResidFile, sumResidFile, avgTimesFile, numRootsFile};
-Print[numFmt[perDegMax]];
 Print["Program Finished"];
 Exit[];
-
