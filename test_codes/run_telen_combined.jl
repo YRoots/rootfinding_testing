@@ -50,10 +50,10 @@ const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids")
 # ----------------------------------------------------------------------------
 
 Base.@kwdef mutable struct Config
-    suite::String = "dense"           # "sparse" | "dense"
-    dim::Int = 5
+    suite::String = "sparse"           # "sparse" | "dense"
+    dim::Int = 8
     mindeg::Int = 2
-    maxdeg::Int = 10
+    maxdeg::Int = 30
     nonzero::Int = 3                   # sparse only: terms per polynomial
     num_tests::Int = 100
     coeff_dir::Union{String,Nothing} = nothing   # defaults per suite

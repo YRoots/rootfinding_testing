@@ -55,7 +55,7 @@ import numpy as np
 # Configuration
 # -----------------------
 SUITE = "sparse"  # "sparse" | "dense"
-dim = 4           # number of variables (square system: n_eq = dim)
+dim = 8           # number of variables (square system: n_eq = dim)
 mindeg = 2
 maxdeg = 15
 nonzero = 3       # sparse only: terms per polynomial (used in paths)
