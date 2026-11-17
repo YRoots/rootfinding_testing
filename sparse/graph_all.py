@@ -83,6 +83,7 @@ METHODS = {
     },
     "Chebfun": {
         "path": "results/chebfun_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
+        "roots": "results/chebfun_results/dim{dim}/nonzero{nonzero}",
         "color": "tab:orange",
         "dims": {2},
     },

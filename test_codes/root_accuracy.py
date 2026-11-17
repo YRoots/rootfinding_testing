@@ -14,17 +14,28 @@ CONSENSUS_MIN methods found it. Then for each method and test:
 A test is only judged when at least CONSENSUS_MIN methods have results for
 it; otherwise there is nothing to compare against.
 
-Roots files are read from <roots dir>/roots/roots_deg{deg}.json (the
-{test number: [roots]} layout every run_*_combined script writes), falling
-back to <roots dir>/roots_deg{deg}.txt in either Bertini's or Croots's text
-format.
+Roots are read from the first of these that exists under a roots dir:
+    roots/roots_deg{deg}.json     {test number: [roots]}, written by every
+                                  run_*_combined script
+    roots_deg{deg}.txt            Bertini's or Croots's text output
+    deg{deg}/roots_test{N}.txt    one file per test, one root per line
+    deg{deg}/test{N}_roots.txt    (NSolveValues and Chebfun)
+
+Methods can be split into groups that only vote among themselves, for runs
+that solved different systems (e.g. dense HC, which only has results for
+the original systems, is judged against the original Yroots/Jroots runs).
 """
 import json
 import os
+import re
 
 import numpy as np
 
-TOL = 1e-8
+# Two roots are the same root if every coordinate agrees within TOL. 1e-6
+# is loose enough for solvers that return slightly less precise roots
+# (Chebfun's are typically ~1e-9 off, up to ~2e-8) and still far tighter
+# than the spacing between distinct roots of these random systems.
+TOL = 1e-6
 CONSENSUS_MIN = 2
 DOMAIN_RADIUS = 1.0
 DOMAIN_TOL = 1e-8
@@ -66,10 +77,33 @@ def _parse_croots_txt(lines):
     return results
 
 
+_PER_TEST_FILE = re.compile(r"^(?:roots_test(\d+)|test(\d+)_roots)\.txt$")
+
+
+def _load_per_test_dir(deg_dir):
+    """deg{deg}/ folder with one roots file per test. A file that can't be
+    parsed (e.g. Mathematica's two-line exponent layout) leaves that test
+    out, so it is simply not judged for this method."""
+    results = {}
+    for name in os.listdir(deg_dir):
+        m = _PER_TEST_FILE.match(name)
+        if not m:
+            continue
+        test = int(m.group(1) or m.group(2))
+        try:
+            with open(os.path.join(deg_dir, name)) as f:
+                results[test] = [tuple(float(v) for v in ln.split())
+                                 for ln in f if ln.strip() and not ln.startswith("#")]
+        except ValueError:
+            print(f"  [skip] can't parse {os.path.join(deg_dir, name)}")
+    return results
+
+
 def load_roots(roots_dir, dim, deg, reverse=False):
     """{test number: [root tuples]} for one degree, or None if no file."""
     json_path = os.path.join(roots_dir, "roots", f"roots_deg{deg}.json")
     txt_path = os.path.join(roots_dir, f"roots_deg{deg}.txt")
+    deg_dir = os.path.join(roots_dir, f"deg{deg}")
     if os.path.exists(json_path):
         with open(json_path) as f:
             data = {int(k): [tuple(r) for r in v] for k, v in json.load(f).items()}
@@ -80,6 +114,10 @@ def load_roots(roots_dir, dim, deg, reverse=False):
             data = _parse_bertini_txt(lines, dim)
         else:
             data = _parse_croots_txt(lines)
+    elif os.path.isdir(deg_dir):
+        data = _load_per_test_dir(deg_dir)
+        if not data:
+            return None
     else:
         return None
     if reverse:
@@ -135,24 +173,28 @@ def degree_status(roots_by_method):
     return status
 
 
-def root_status(roots_dirs, dim, degrees, reversed_methods=()):
+def root_status(roots_dirs, dim, degrees, reversed_methods=(), groups=None):
     """
     roots_dirs: {method: roots directory for this dim}.
+    groups: optional {method: group name}; methods only vote with others in
+    the same group. Methods not listed share the default group.
     Returns {method: {deg: status dict}} for every degree where the method
     had roots and was judged against at least one other method.
     """
+    groups = groups or {}
     out = {m: {} for m in roots_dirs}
     for deg in degrees:
         loaded = {}
         for m, d in roots_dirs.items():
             roots = load_roots(d, dim, deg, reverse=m in reversed_methods)
             if roots is not None:
-                loaded[m] = roots
-        if len(loaded) < CONSENSUS_MIN:
-            continue
-        for m, s in degree_status(loaded).items():
-            if s["tests"]:
-                out[m][deg] = s
+                loaded.setdefault(groups.get(m), {})[m] = roots
+        for group in loaded.values():
+            if len(group) < CONSENSUS_MIN:
+                continue
+            for m, s in degree_status(group).items():
+                if s["tests"]:
+                    out[m][deg] = s
     return out
 
 

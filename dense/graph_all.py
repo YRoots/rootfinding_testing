@@ -89,20 +89,45 @@ METHODS = {
             2: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
             3: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
         },
+        "roots": "results/NSolveValues_results/dim{dim}",
+        "roots_reversed": True,
         "color": "tab:red",
     },
     "Reduce": {
         "path": "results/reduce_results/dim{dim}_{arg}.txt",
+        # No "roots": the dense Reduce runs never saved their roots
+        # (dim{d}_deg{n}_output.txt only holds the polynomials).
         "color": "m",
     },
     "Chebfun": {
         "path": "results/chebfun_results/dim{dim}_{arg}.txt",
+        "roots": "results/chebfun_results/{dim}d_all",
+        "roots_reversed": True,
         "color": "tab:orange",
         "dims": {2},
     },
     "HomotopyContinuation": {
         "path": "results/hc_results/dim{dim}/{arg}.txt",
+        # HC only has results for the original (non-zero constant term)
+        # systems, so it is judged against the original Yroots/Jroots runs
+        # in ROOT_VOTERS instead of the newer runs above.
+        "roots": "results/hc_results/dim{dim}",
+        "roots_group": "original",
         "color": "tab:brown",
+    },
+}
+
+# Extra roots that vote on which roots are real but are never plotted.
+# Methods only vote within their "roots_group" (default: the newer runs).
+ROOT_VOTERS = {
+    "Yroots (original systems)": {
+        "roots": "results/yroots_results/dim{dim}",
+        "roots_group": "original",
+    },
+    "Jroots (original systems)": {
+        "roots": "results/jroots_results/dim{dim}",
+        "roots_reversed": True,
+        "roots_group": "original",
     },
 }
 
@@ -128,8 +153,8 @@ METHODS_ENABLED = {
 #   o  all roots found     v  missed roots
 #   ^  spurious roots      D  missed + spurious
 # Non-o markers are labelled with the number of tests at that degree that
-# had the problem. HomotopyContinuation has no roots entry because its
-# roots come from the older, non-zero-constant-term systems.
+# had the problem. Every solver with saved roots gets markers; Reduce has
+# none saved for dense.
 SHOW_ROOT_MARKERS = True
 
 
@@ -172,15 +197,17 @@ def compute_root_status(dim, max_deg):
     """{method label: {deg: status}} for every method with roots. Disabled
     methods still vote on which roots are real, so hiding a line does not
     change the other lines' markers."""
+    configs = {**METHODS, **ROOT_VOTERS}
     roots_dirs = {
         label: config["roots"].format(dim=dim)
-        for label, config in METHODS.items()
+        for label, config in configs.items()
         if "roots" in config and ("dims" not in config or dim in config["dims"])
     }
     reversed_methods = {label for label in roots_dirs
-                        if METHODS[label].get("roots_reversed")}
+                        if configs[label].get("roots_reversed")}
+    groups = {label: configs[label].get("roots_group") for label in roots_dirs}
     return root_accuracy.root_status(
-        roots_dirs, dim, range(MIN_DEGREE, max_deg + 1), reversed_methods)
+        roots_dirs, dim, range(MIN_DEGREE, max_deg + 1), reversed_methods, groups)
 
 
 def plot_metric(dim, arg, max_deg, root_status=None):
