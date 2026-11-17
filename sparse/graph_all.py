@@ -159,7 +159,7 @@ def load_method_series(config, dim, nonzero, arg, max_deg):
 def compute_root_status(dim, max_deg, nonzero):
     """{method label: {deg: status}} for every method with roots."""
     roots_dirs = {
-        label: config["roots"].format(dim=dim, nonzero=nonzero)
+        label: config.get("dim_roots", {}).get(dim, config["roots"]).format(dim=dim, nonzero=nonzero)
         for label, config in METHODS.items()
         if "roots" in config and ("dims" not in config or dim in config["dims"])
     }

@@ -11,8 +11,10 @@ CONSENSUS_MIN methods found it. Then for each method and test:
     spurious = roots this method returned that are not real (including a
                real root listed more than once)
 
-A test is only judged when at least CONSENSUS_MIN methods have results for
-it; otherwise there is nothing to compare against.
+A test is only judged when at least MIN_SOLVERS_PER_TEST methods have
+results for it. With only two, a root one of them found and the other did
+not can't be blamed on either (e.g. dense Chebfun and NSolveValues ran 300
+tests, everything else 100).
 
 Roots are read from the first of these that exists under a roots dir:
     roots/roots_deg{deg}.json     {test number: [roots]}, written by every
@@ -20,6 +22,8 @@ Roots are read from the first of these that exists under a roots dir:
     roots_deg{deg}.txt            Bertini's or Croots's text output
     deg{deg}/roots_test{N}.txt    one file per test, one root per line
     deg{deg}/test{N}_roots.txt    (NSolveValues and Chebfun)
+A roots path containing "{deg}" instead names one file per degree in the
+older Mathematica output layout (N"end" ... "Roots: "{{x1, x2}, ...}).
 
 Methods can be split into groups that only vote among themselves, for runs
 that solved different systems (e.g. dense HC, which only has results for
@@ -37,6 +41,7 @@ import numpy as np
 # than the spacing between distinct roots of these random systems.
 TOL = 1e-6
 CONSENSUS_MIN = 2
+MIN_SOLVERS_PER_TEST = 3
 DOMAIN_RADIUS = 1.0
 DOMAIN_TOL = 1e-8
 
@@ -99,8 +104,42 @@ def _load_per_test_dir(deg_dir):
     return results
 
 
+_MMA_TEST = re.compile(r'^(\d+)"end"', re.M)
+_MMA_ROOTS = re.compile(r'"Roots: "(\{.*?\}\}|\{\})', re.S)
+
+
+def _load_mathematica_output(path):
+    """Roots from an old run_NSolve output file: each test starts with
+    N"end" and lists its roots as "Roots: "{{a, b}, {c, d}}."""
+    with open(path) as f:
+        text = f.read()
+    starts = list(_MMA_TEST.finditer(text))
+    results = {}
+    for i, m in enumerate(starts):
+        end = starts[i + 1].start() if i + 1 < len(starts) else len(text)
+        found = _MMA_ROOTS.search(text, m.end(), end)
+        if not found:
+            continue
+        body = re.sub(r"\s", "", found.group(1)).replace("*^", "e")
+        try:
+            results[int(m.group(1))] = [
+                tuple(float(v) for v in root.split(","))
+                for root in re.findall(r"\{([^{}]+)\}", body)]
+        except ValueError:
+            print(f"  [skip] can't parse test {m.group(1)} in {path}")
+    return results
+
+
 def load_roots(roots_dir, dim, deg, reverse=False):
     """{test number: [root tuples]} for one degree, or None if no file."""
+    if "{deg}" in roots_dir:
+        path = roots_dir.replace("{deg}", str(deg))
+        if not os.path.exists(path):
+            return None
+        data = _load_mathematica_output(path)
+        if reverse:
+            data = {t: [r[::-1] for r in roots] for t, roots in data.items()}
+        return data
     json_path = os.path.join(roots_dir, "roots", f"roots_deg{deg}.json")
     txt_path = os.path.join(roots_dir, f"roots_deg{deg}.txt")
     deg_dir = os.path.join(roots_dir, f"deg{deg}")
@@ -144,7 +183,7 @@ def degree_status(roots_by_method):
     all_tests = set().union(*(set(d) for d in roots_by_method.values()))
     for test in all_tests:
         present = [m for m, d in roots_by_method.items() if test in d]
-        if len(present) < CONSENSUS_MIN:
+        if len(present) < MIN_SOLVERS_PER_TEST:
             continue
         clusters = []  # [representative root, set of methods, count per method]
         extra = {m: 0 for m in present}  # duplicates of a root already listed
@@ -190,7 +229,7 @@ def root_status(roots_dirs, dim, degrees, reversed_methods=(), groups=None):
             if roots is not None:
                 loaded.setdefault(groups.get(m), {})[m] = roots
         for group in loaded.values():
-            if len(group) < CONSENSUS_MIN:
+            if len(group) < MIN_SOLVERS_PER_TEST:
                 continue
             for m, s in degree_status(group).items():
                 if s["tests"]:

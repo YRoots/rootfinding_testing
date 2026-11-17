@@ -54,6 +54,7 @@ METRICS = {
 #   "roots"     directory holding this method's roots (roots/roots_deg*.json);
 #               methods with one get root-accuracy markers, see ROOT MARKERS
 #   "roots_reversed"  True if the roots store coordinates as (xd, ..., x1)
+#   "dim_roots" per-dimension override of "roots" (like "dim_paths")
 #
 # A path ending in .npy is loaded with np.load; anything else is parsed as
 # one plain value per line.
@@ -90,6 +91,12 @@ METHODS = {
             3: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
         },
         "roots": "results/NSolveValues_results/dim{dim}",
+        # dims 2-3 are plotted from the older "2_cont" run, whose roots
+        # are inside its per-degree Mathematica output files.
+        "dim_roots": {
+            2: "results/NSolveValues_results/dim{dim}_deg{{deg}}_output2.txt",
+            3: "results/NSolveValues_results/dim{dim}_deg{{deg}}_output2.txt",
+        },
         "roots_reversed": True,
         "color": "tab:red",
     },
@@ -199,7 +206,7 @@ def compute_root_status(dim, max_deg):
     change the other lines' markers."""
     configs = {**METHODS, **ROOT_VOTERS}
     roots_dirs = {
-        label: config["roots"].format(dim=dim)
+        label: config.get("dim_roots", {}).get(dim, config["roots"]).format(dim=dim)
         for label, config in configs.items()
         if "roots" in config and ("dims" not in config or dim in config["dims"])
     }
