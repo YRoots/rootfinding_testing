@@ -1,7 +1,11 @@
 import os
+import sys
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mticker
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "test_codes"))
+import root_accuracy  # noqa: E402
 
 plt.rcParams["figure.dpi"] = 400
 
@@ -47,23 +51,36 @@ METRICS = {
 #   "dims"      restricts a method to specific dimensions (e.g. Chebfun only
 #               has dim-2 results); omit to include it for every dimension
 #
+#   "roots"     directory holding this method's roots (roots/roots_deg*.json);
+#               methods with one get root-accuracy markers, see ROOT MARKERS
+#   "roots_reversed"  True if the roots store coordinates as (xd, ..., x1)
+#
 # A path ending in .npy is loaded with np.load; anything else is parsed as
 # one plain value per line.
+#
+# Results come from the newer runs (folders named *_new / *2 /
+# yroots_results-optimize), which all solve the same zero-constant-term
+# systems, so their roots can be compared with each other.
 METHODS = {
     "Yroots": {
         "path": "results/yroots_results-optimize/dim{dim}/{arg}.txt",
+        "roots": "results/yroots_results-optimize/dim{dim}",
         "color": "royalblue",
     },
     "Jroots": {
         "path": "results/jroots_results2/dim{dim}/{arg}.txt",
+        "roots": "results/jroots_results2/dim{dim}",
+        "roots_reversed": True,
         "color": "navy",
     },
     "MTV": {
         "path": "results/telen_results_new/dim{dim}/{arg}.txt",
+        "roots": "results/telen_results_new/dim{dim}",
         "color": "tab:purple",
     },
     "Bertini": {
         "path": "results/bertini_results_new/v1.6/dim{dim}/{arg}.txt",
+        "roots": "results/bertini_results_new/v1.6/dim{dim}",
         "color": "tab:green",
     },
     "NSolveValues": {
@@ -102,6 +119,19 @@ METHODS_ENABLED = {
     "HomotopyContinuation": True,
 }
 
+# ----------------------------------------------------------------------
+# ROOT MARKERS
+# ----------------------------------------------------------------------
+# For every method with a "roots" entry, each degree's point gets a marker
+# shaped by how its roots compare with the other methods' (consensus: a root
+# is real if at least 2 methods found it; see test_codes/root_accuracy.py):
+#   o  all roots found     v  missed roots
+#   ^  spurious roots      D  missed + spurious
+# Non-o markers are labelled with the number of tests at that degree that
+# had the problem. HomotopyContinuation has no roots entry because its
+# roots come from the older, non-zero-constant-term systems.
+SHOW_ROOT_MARKERS = True
+
 
 # ----------------------------------------------------------------------
 # CORE LOGIC
@@ -138,7 +168,22 @@ def load_method_series(config, dim, arg, max_deg):
     return values[:max_deg - MIN_DEGREE + 1]
 
 
-def plot_metric(dim, arg, max_deg):
+def compute_root_status(dim, max_deg):
+    """{method label: {deg: status}} for every method with roots. Disabled
+    methods still vote on which roots are real, so hiding a line does not
+    change the other lines' markers."""
+    roots_dirs = {
+        label: config["roots"].format(dim=dim)
+        for label, config in METHODS.items()
+        if "roots" in config and ("dims" not in config or dim in config["dims"])
+    }
+    reversed_methods = {label for label in roots_dirs
+                        if METHODS[label].get("roots_reversed")}
+    return root_accuracy.root_status(
+        roots_dirs, dim, range(MIN_DEGREE, max_deg + 1), reversed_methods)
+
+
+def plot_metric(dim, arg, max_deg, root_status=None):
     info = METRICS[arg]
     fig, ax = plt.subplots()
     ax.set_yscale("log")
@@ -154,18 +199,28 @@ def plot_metric(dim, arg, max_deg):
         x = np.arange(MIN_DEGREE, MIN_DEGREE + len(series))
         # A one-degree series has no segment to draw, so mark the point
         # instead of drawing an invisible line.
-        marker = SINGLE_POINT_MARKER if len(series) == 1 else None
+        statuses = (root_status or {}).get(label)
+        marker = SINGLE_POINT_MARKER if len(series) == 1 and not statuses else None
         ax.plot(x, series, color=config["color"], marker=marker, label=label)
+        if statuses:
+            root_accuracy.draw_markers(ax, x, series, statuses, config["color"])
 
     ax.set_ylabel(info["ylabel"])
     ax.set_xlabel("Degree")
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.legend()
+    # Both legends sit outside the axes so they never cover data.
+    method_legend = ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1),
+                              fontsize=6, title="Method", title_fontsize=6)
+    if root_status and any(root_status.values()):
+        ax.add_artist(method_legend)
+        ax.legend(handles=root_accuracy.marker_legend_handles(),
+                  loc="lower left", bbox_to_anchor=(1.02, 0),
+                  fontsize=6, title="Roots", title_fontsize=6)
     plt.title(f"Dim {dim} {info['title']}")
 
     out_dir = f"graphs/dim{dim}"
     os.makedirs(out_dir, exist_ok=True)
-    plt.savefig(f"{out_dir}/new_dim{dim}_{arg}.png")
+    plt.savefig(f"{out_dir}/new_dim{dim}_{arg}.png", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -182,8 +237,9 @@ def main():
                 f"No max-degree entry for dim {dim} — add one to DIM_MAX_DEGREES."
             )
         max_deg = DIM_MAX_DEGREES[dim]
+        root_status = compute_root_status(dim, max_deg) if SHOW_ROOT_MARKERS else None
         for arg in METRICS:
-            plot_metric(dim, arg, max_deg)
+            plot_metric(dim, arg, max_deg, root_status)
 
 
 if __name__ == "__main__":
