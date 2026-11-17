@@ -51,19 +51,19 @@ METRICS = {
 # one plain value per line.
 METHODS = {
     "Yroots": {
-        "path": "results/yroots_results/dim{dim}/{arg}.txt",
+        "path": "results/yroots_results-optimize/dim{dim}/{arg}.txt",
         "color": "royalblue",
     },
     "Jroots": {
-        "path": "results/jroots_results/dim{dim}/{arg}.txt",
+        "path": "results/jroots_results2/dim{dim}/{arg}.txt",
         "color": "navy",
     },
     "MTV": {
-        "path": "results/telen_results/dim{dim}/{arg}.txt",
+        "path": "results/telen_results_new/dim{dim}/{arg}.txt",
         "color": "tab:purple",
     },
     "Bertini": {
-        "path": "results/bertini_results/v1.6/dim{dim}/{arg}.txt",
+        "path": "results/bertini_results_new/v1.6/dim{dim}/{arg}.txt",
         "color": "tab:green",
     },
     "NSolveValues": {
@@ -165,7 +165,7 @@ def plot_metric(dim, arg, max_deg):
 
     out_dir = f"graphs/dim{dim}"
     os.makedirs(out_dir, exist_ok=True)
-    plt.savefig(f"{out_dir}/dim{dim}_{arg}.png")
+    plt.savefig(f"{out_dir}/new_dim{dim}_{arg}.png")
     plt.close(fig)
 
 
