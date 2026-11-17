@@ -61,8 +61,8 @@ import numpy as np
 # -----------------------
 # Configuration
 # -----------------------
-SUITE = "sparse"  # "sparse" | "dense"
-dim = 8           # number of variables (square system: n_eq = dim)
+SUITE = "dense"  # "sparse" | "dense"
+dim = 5           # number of variables (square system: n_eq = dim)
 mindeg = 2
 maxdeg = 15
 nonzero = 3       # sparse only: terms per polynomial (used in paths)
@@ -72,7 +72,7 @@ zero_constant_term = True  # dense only: force the constant coefficient to 0
 # Stop early once a degree's average Bertini CPU time per system (the value
 # written to avg_times.txt) exceeds this many seconds. That degree is still
 # finished and saved; higher degrees are skipped. None = run up to maxdeg.
-max_avg_time = 100
+max_avg_time = 2000
 
 # Keep only real roots with max |x_i| <= DOMAIN_RADIUS + DOMAIN_TOL, the box
 # [-1, 1]^dim the other solvers search. DOMAIN_TOL = 0 matches compare_roots.py.

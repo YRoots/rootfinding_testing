@@ -13,16 +13,10 @@ plt.rcParams["figure.dpi"] = 400
 # CONFIG — edit these to control what gets plotted
 # ----------------------------------------------------------------------
 
-# Which dimensions to generate graphs for. Add/remove freely; the max
-# degree for each one is looked up from DIM_MAX_DEGREES below.
 DIMS_TO_PLOT = [2, 3, 4, 5]
 
-# Every results file holds one value per degree, starting at this degree.
 MIN_DEGREE = 2
 
-# Highest degree to plot, per dimension. Methods with shorter files just
-# stop early. Add an entry here before adding a new dimension to
-# DIMS_TO_PLOT.
 DIM_MAX_DEGREES = {
     2: 30,
     3: 20,
@@ -30,11 +24,16 @@ DIM_MAX_DEGREES = {
     5: 5,
 }
 
+# Which tests to check, per dim/degree:
+#   None              every test that has results
+#   100               tests 1-100
+#   range(1, 51)      tests 1-50 (any list/range of test numbers works)
+ROOT_TESTS = 100
+
 # Marker drawn for a method that only has a single degree of data, where
 # a line would have nothing to connect and so would not show up at all.
 SINGLE_POINT_MARKER = "o"
 
-# Metric files to read, and the titles/axis labels to use for each.
 METRICS = {
     "avg_times": {"title": "Dense Average Times", "ylabel": "Time Log Scale"},
     "avg_resids": {"title": "Dense Average Residuals", "ylabel": "Residual"},
@@ -163,13 +162,6 @@ METHODS_ENABLED = {
 # had the problem. Every solver with saved roots gets markers; Reduce has
 # none saved for dense.
 SHOW_ROOT_MARKERS = True
-
-# Which tests to check, per dim/degree:
-#   None              every test that has results
-#   100               tests 1-100
-#   range(1, 51)      tests 1-50 (any list/range of test numbers works)
-ROOT_TESTS = None
-
 
 # ----------------------------------------------------------------------
 # CORE LOGIC

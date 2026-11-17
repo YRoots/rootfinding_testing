@@ -291,7 +291,7 @@ def draw_markers(ax, degrees, values, statuses, color):
                 linestyle="none", zorder=3)
         if kind != "ok":
             ax.annotate(str(s["bad"]), (deg, val), textcoords="offset points",
-                        xytext=(3, 3), fontsize=LABEL_FONTSIZE, color=color)
+                        xytext=(3, 3), fontsize=LABEL_FONTSIZE, color='black')
 
 
 def marker_legend_handles():
