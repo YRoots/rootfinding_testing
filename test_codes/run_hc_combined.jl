@@ -60,9 +60,9 @@ const SUMMARIES = ("avg_times", "max_resids", "avg_resids", "sum_resids",
 
 Base.@kwdef mutable struct Config
     suite::String = "sparse"           # "sparse" | "dense"
-    dim::Int = 2
+    dim::Int = 8
     mindeg::Int = 2
-    maxdeg::Int = 10
+    maxdeg::Int = 30
     nonzero::Int = 3                   # sparse only: terms per polynomial
     num_tests::Int = 100
     coeff_dir::Union{String,Nothing} = nothing   # defaults per suite
@@ -72,12 +72,13 @@ Base.@kwdef mutable struct Config
     warmup::Int = 10                   # untimed solves at mindeg to absorb JIT cost
     imag_tol::Float64 = 1e-10          # a root counts as real if max |imag| <= imag_tol
     box_tol::Float64 = 0.0             # keep roots with |x_k| <= 1 + box_tol
-    zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0,
-                                       # as the MTV/Bertini/Chebfun/NSolve dense runs do
+    zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0
+
     # Stop early once a degree's average solve time (the value written to
     # avg_times) exceeds this many seconds. That degree is still finished and
     # saved; higher degrees are skipped. nothing = run up to maxdeg.
-    max_avg_time::Union{Float64,Nothing} = 100
+    max_avg_time::Union{Float64,Nothing} = 2000
+
     # HomotopyContinuation.solve options
     start_system::Symbol = :polyhedral # :polyhedral | :total_degree
     compile::Bool = false              # compiling costs seconds per new system support
@@ -94,10 +95,7 @@ function resolve!(cfg::Config)
         cfg.coeff_dir = cfg.suite == "sparse" ? "../sparse/coeffs" : "../dense/coeffs"
     end
     if cfg.result_dir === nothing
-        # Dense results go to hc_results_new: the older hc_results/ runs kept
-        # the constant term, so they solved different systems.
-        cfg.result_dir = cfg.suite == "sparse" ? "../sparse/results/hc_results" :
-                                                 "../dense/results/hc_results_new"
+        cfg.result_dir = "../$(cfg.suite)/results/hc_results_new"
     end
     return cfg
 end

@@ -109,9 +109,6 @@ METHODS = {
         "dims": {2},
     },
     "HomotopyContinuation": {
-        # The zero-constant-term run (run_hc_combined.jl, suite "dense").
-        # The older hc_results/ kept the constant term, so it solved
-        # different systems and isn't used.
         "path": "results/hc_results_new/dim{dim}/{arg}.txt",
         "roots": "results/hc_results_new/dim{dim}",
         "color": "tab:brown",
