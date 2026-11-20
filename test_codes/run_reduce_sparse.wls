@@ -6,7 +6,6 @@ Off[Set::shape];
    Writes, under ../sparse/results/reduce_results/dim{dim}/nonzero{nonzero}:
      avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
                                 one value per line, one line per degree
-     num_roots.txt              one line per degree: numTests root counts
      roots/roots_deg{deg}.json  {test number: [roots]}, same layout as yroots/jroots
    Roots are stored as (xd, ..., x1): useTensor maps the coefficient tensor's
    first axis to the last variable (graph_all.py marks this "roots_reversed"). *)
@@ -122,7 +121,6 @@ maxResidFile = OpenWrite[FileNameJoin[{baseDir, "max_resids.txt"}]];
 avgResidFile = OpenWrite[FileNameJoin[{baseDir, "avg_resids.txt"}]];
 sumResidFile = OpenWrite[FileNameJoin[{baseDir, "sum_resids.txt"}]];
 avgTimesFile = OpenWrite[FileNameJoin[{baseDir, "avg_times.txt"}]];
-numRootsFile = OpenWrite[FileNameJoin[{baseDir, "num_roots.txt"}]];
 
 For[deg = minDeg, deg <= maxDeg, deg++,
 
@@ -138,7 +136,6 @@ For[deg = minDeg, deg <= maxDeg, deg++,
   (* Per-degree accumulators *)
   allTimes = {};
   allResids = {};
-  allNumRoots = {};
   rootsByTest = {};
 
   For[test = 1, test <= Min[numTests, Length[data]], test++,
@@ -168,7 +165,6 @@ For[deg = minDeg, deg <= maxDeg, deg++,
     appendResiduals[solList];
 
     allTimes    = Append[allTimes, timeVal];
-    allNumRoots = Append[allNumRoots, Length[solList]];
     rootsByTest = Append[rootsByTest, solList];
 
     If[Mod[test, 10] == 0, Print["deg ", deg, ", test ", test, "/", numTests]];
@@ -186,9 +182,8 @@ For[deg = minDeg, deg <= maxDeg, deg++,
   WriteString[avgResidFile,  numFmt[perDegAvg],  "\n"];
   WriteString[sumResidFile,  numFmt[perDegSum],  "\n"];
   WriteString[avgTimesFile,  numFmt[perDegTime], "\n"];
-  WriteString[numRootsFile, StringRiffle[ToString /@ allNumRoots, " "], "\n"];
 ];
 
-Close /@ {maxResidFile, avgResidFile, sumResidFile, avgTimesFile, numRootsFile};
+Close /@ {maxResidFile, avgResidFile, sumResidFile, avgTimesFile};
 Print["Program Finished"];
 Exit[];

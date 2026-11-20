@@ -3,7 +3,6 @@
 % Run from test_codes/. Writes, under ../dense/results/chebfun_results/dim2:
 %   avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
 %                              one value per line, one line per degree
-%   num_roots.txt              one line per degree: numTests root counts
 %   roots/roots_deg{deg}.json  {test number: [roots]}, same layout as yroots/jroots
 %
 % Like every dense run, the constant coefficient is set to 0.
@@ -29,7 +28,6 @@ time_fid      = fopen(fullfile(baseDir, "avg_times.txt"),  'w');
 avg_res_fid   = fopen(fullfile(baseDir, "avg_resids.txt"), 'w');
 max_res_fid   = fopen(fullfile(baseDir, "max_resids.txt"), 'w');
 sum_res_fid   = fopen(fullfile(baseDir, "sum_resids.txt"), 'w');
-num_roots_fid = fopen(fullfile(baseDir, "num_roots.txt"),  'w');
 
 for deg = minDeg:maxDeg
     % Same Mathematica-JSON coefficients the yroots/jroots/NSolve dense runs read
@@ -40,7 +38,6 @@ for deg = minDeg:maxDeg
 
     all_times     = nan(1, reps);
     all_resids    = [];
-    all_num_roots = zeros(1, reps);
     roots_by_test = cell(1, reps);
 
     for test = 1:reps
@@ -65,7 +62,6 @@ for deg = minDeg:maxDeg
             all_resids(end+1) = abs(F(roots_(k,1), roots_(k,2))); %#ok<AGROW>
             all_resids(end+1) = abs(G(roots_(k,1), roots_(k,2))); %#ok<AGROW>
         end
-        all_num_roots(test) = size(roots_,1);
         roots_by_test{test} = roots_;
 
         if mod(test,10) == 0
@@ -80,14 +76,12 @@ for deg = minDeg:maxDeg
     fprintf(avg_res_fid, '%.17g\n', mean(all_resids));
     fprintf(max_res_fid, '%.17g\n', max([all_resids, NaN]));
     fprintf(sum_res_fid, '%.17g\n', sum(all_resids));
-    fprintf(num_roots_fid, '%s\n', strjoin(string(all_num_roots), ' '));
 end
 
 fclose(time_fid);
 fclose(avg_res_fid);
 fclose(max_res_fid);
 fclose(sum_res_fid);
-fclose(num_roots_fid);
 
 exit;
 
