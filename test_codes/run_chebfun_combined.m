@@ -1,8 +1,7 @@
 % Benchmark Chebfun2 on the dense or sparse test suite (dim 2 only).
 %
-% Run from test_codes/. Set the parameters below, or pass any of them in
-% before the script runs, e.g.
-%   matlab -batch "suite='sparse'; maxDeg=20; run_chebfun_combined"
+% Set the parameters below, then run from test_codes/:
+%   matlab -batch "run_chebfun_combined"
 %
 % Writes, under ../<suite>/results/chebfun_results/dim2[/nonzero{nonZero}]:
 %   avg_times.txt, max_resids.txt, avg_resids.txt, sum_resids.txt
@@ -23,22 +22,14 @@
 addpath('../chebfun');
 cheb.xy;
 
-% ---------------- Parameters (defaults unless set beforehand) ----------------
-if ~exist('suite', 'var'),      suite = "dense";   end   % "dense" | "sparse"
-suite = string(suite);
-if ~any(suite == ["dense", "sparse"])
-    error("suite must be ""dense"" or ""sparse"", not ""%s""", suite);
-end
-dim = 2;                                                   % Chebfun2: dim 2 only
-if ~exist('nonZero', 'var'),    nonZero = 3;       end   % sparse only: terms per polynomial
-if ~exist('minDeg', 'var'),     minDeg = 2;        end
-if ~exist('maxDeg', 'var')
-    if suite == "dense", maxDeg = 50; else, maxDeg = 30; end
-end
-if ~exist('numTests', 'var')
-    if suite == "dense", numTests = 300; else, numTests = 100; end
-end
-if ~exist('maxAvgTime', 'var'), maxAvgTime = 300;  end   % seconds; Inf to run every degree
+% ---------------- Parameters ----------------
+suite      = "dense";   % "dense" or "sparse"
+dim        = 2;         % Chebfun2 only solves dim 2
+nonZero    = 3;         % sparse only: terms per polynomial
+numTests   = 100;
+minDeg     = 2;
+maxDeg     = 30;
+maxAvgTime = 1000;       % seconds; Inf to run every degree
 
 nzText = "";
 if suite == "sparse", nzText = sprintf(", nonzero=%d", nonZero); end
@@ -47,9 +38,9 @@ fprintf("Parameters: suite=%s, dim=%d, degrees=%d to %d, tests=%d%s\n", ...
 
 % ---------------- Output ----------------
 if suite == "dense"
-    baseDir = sprintf("../dense/results/chebfun_results/dim%d", dim);
+    baseDir = sprintf("../dense/results/chebfun_results_new/dim%d", dim);
 else
-    baseDir = sprintf("../sparse/results/chebfun_results/dim%d/nonzero%d", dim, nonZero);
+    baseDir = sprintf("../sparse/results/chebfun_results_new/dim%d/nonzero%d", dim, nonZero);
 end
 rootsDir = fullfile(baseDir, "roots");
 if ~exist(rootsDir, 'dir'), mkdir(rootsDir); end
