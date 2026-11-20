@@ -7,7 +7,7 @@ Run from test_codes/ (after convert_roots_to_json.py). Same layout as yroots:
       dims 2-5); before this its roots existed only in those Mathematica logs.
 
   dense/results/NSolveValues_results_partial/dim2/roots/roots_deg{2,30}.json
-      a later run_NSolve_dense.wls run that stopped early (its summary files
+      a later run_NSolve_dense.wls (now run_NSolve_combined.wls) run that stopped early (its summary files
       are empty). Degree 2 is restored from git (convert_roots_to_json.py had
       replaced it with the near-identical "2_cont" roots) and degree 30 is
       moved out of NSolveValues_results/dim2/roots, so that folder holds only
