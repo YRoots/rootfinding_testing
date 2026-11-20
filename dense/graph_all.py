@@ -109,29 +109,18 @@ METHODS = {
         "dims": {2},
     },
     "HomotopyContinuation": {
-        "path": "results/hc_results/dim{dim}/{arg}.txt",
-        # HC only has results for the original (non-zero constant term)
-        # systems, so it is judged against the original Yroots/Jroots runs
-        # in ROOT_VOTERS instead of the newer runs above.
-        "roots": "results/hc_results/dim{dim}",
-        "roots_group": "original",
+        # The zero-constant-term run (run_hc_combined.jl, suite "dense").
+        # The older hc_results/ kept the constant term, so it solved
+        # different systems and isn't used.
+        "path": "results/hc_results_new/dim{dim}/{arg}.txt",
+        "roots": "results/hc_results_new/dim{dim}",
         "color": "tab:brown",
     },
 }
 
 # Extra roots that vote on which roots are real but are never plotted.
 # Methods only vote within their "roots_group" (default: the newer runs).
-ROOT_VOTERS = {
-    "Yroots (original systems)": {
-        "roots": "results/yroots_results/dim{dim}",
-        "roots_group": "original",
-    },
-    "Jroots (original systems)": {
-        "roots": "results/jroots_results/dim{dim}",
-        "roots_reversed": True,
-        "roots_group": "original",
-    },
-}
+ROOT_VOTERS = {}
 
 # Flip a method to False to leave it out of every graph without
 # deleting its config above. Keys must match METHODS.

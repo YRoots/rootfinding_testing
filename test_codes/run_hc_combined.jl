@@ -26,6 +26,9 @@ polynomials and writes, under the run's base directory
 The .txt files hold one plain value per line in degree order; the JSON files
 match the layout of run_jroots_combined.jl and run_yroots_combined.py, so the
 runs can be diffed directly with compare_roots.py.
+
+With max_avg_time set, the run stops after the first degree whose average solve
+time exceeds it (that degree is still saved), as run_telen_combined.jl does.
 """
 
 # Threads HomotopyContinuation uses when Config.threading is true. Julia fixes its
@@ -63,13 +66,18 @@ Base.@kwdef mutable struct Config
     nonzero::Int = 3                   # sparse only: terms per polynomial
     num_tests::Int = 100
     coeff_dir::Union{String,Nothing} = nothing   # defaults per suite
-    result_dir::Union{String,Nothing} = nothing  # defaults to ../<suite>/results/hc_results
+    result_dir::Union{String,Nothing} = nothing  # defaults to ../sparse/results/hc_results
+                                       # or ../dense/results/hc_results_new
     append::Bool = false               # true to add degrees to an existing run
     warmup::Int = 10                   # untimed solves at mindeg to absorb JIT cost
     imag_tol::Float64 = 1e-10          # a root counts as real if max |imag| <= imag_tol
     box_tol::Float64 = 0.0             # keep roots with |x_k| <= 1 + box_tol
     zero_constant_term::Bool = true    # dense only: force the constant coefficient to 0,
                                        # as the MTV/Bertini/Chebfun/NSolve dense runs do
+    # Stop early once a degree's average solve time (the value written to
+    # avg_times) exceeds this many seconds. That degree is still finished and
+    # saved; higher degrees are skipped. nothing = run up to maxdeg.
+    max_avg_time::Union{Float64,Nothing} = 100
     # HomotopyContinuation.solve options
     start_system::Symbol = :polyhedral # :polyhedral | :total_degree
     compile::Bool = false              # compiling costs seconds per new system support
@@ -86,7 +94,10 @@ function resolve!(cfg::Config)
         cfg.coeff_dir = cfg.suite == "sparse" ? "../sparse/coeffs" : "../dense/coeffs"
     end
     if cfg.result_dir === nothing
-        cfg.result_dir = "../$(cfg.suite)/results/hc_results"
+        # Dense results go to hc_results_new: the older hc_results/ runs kept
+        # the constant term, so they solved different systems.
+        cfg.result_dir = cfg.suite == "sparse" ? "../sparse/results/hc_results" :
+                                                 "../dense/results/hc_results_new"
     end
     return cfg
 end
@@ -323,6 +334,14 @@ function run_benchmark(cfg::Config)
         append_value(summary_paths["sum_resids"], safe(sum, all_res))
         append_value(summary_paths["avg_paths"], safe(mean, path_counts))
         append_value(summary_paths["avg_failed_paths"], safe(mean, failed_counts))
+
+        avg_time = safe(mean, times)
+        @printf("deg %d: avg solve time %.4g s\n", deg, avg_time)
+        if cfg.max_avg_time !== nothing && deg < cfg.maxdeg && avg_time > cfg.max_avg_time
+            @printf("Stopping: deg %d averaged %.4g s per system, over max_avg_time = %g s. Degrees %d-%d skipped.\n",
+                    deg, avg_time, cfg.max_avg_time, deg + 1, cfg.maxdeg)
+            break
+        end
     end
 
     println("Program Finished")
