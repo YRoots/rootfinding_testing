@@ -102,6 +102,12 @@ METHODS = {
         "roots": "results/croot_results/dim{dim}/nonzero{nonzero}",
         "color": "slategrey",
     },
+    "HomotopyContinuation": {
+        # run_hc_combined.jl with suite "sparse"
+        "path": "results/hc_results_new/dim{dim}/nonzero{nonzero}/{arg}.txt",
+        "roots": "results/hc_results_new/dim{dim}/nonzero{nonzero}",
+        "color": "tab:brown",
+    },
 }
 
 # Flip a method to False to leave it out of every graph without
@@ -117,6 +123,7 @@ METHODS_ENABLED = {
     "Yroots-Lambda": False,
     "Jroots-Lambda": False,
     "Croots": False,
+    "HomotopyContinuation": True,
 }
 
 # ----------------------------------------------------------------------
