@@ -21,7 +21,7 @@ Off[Set::shape];
    time is above maxAvgTime seconds, the remaining (higher) degrees are skipped. *)
 
 (* ---------------- Settings ---------------- *)
-maxAvgTime       = 300;       (* seconds; Infinity to always run every degree *)
+maxAvgTime       = 1000;       (* seconds; Infinity to always run every degree *)
 wp               = 15;        (* WorkingPrecision passed to NSolveValues *)
 zeroConstantTerm = True;      (* dense only: set every constant coefficient to 0,
                                  as every other dense run does *)
@@ -160,7 +160,7 @@ writeRootsJSON[path_, rootsByTest_Association] := Module[
 ];
 
 baseDir = FileNameJoin[Join[
-  {"..", suite, "results", "NSolveValues_results", "dim" <> ToString[dim]},
+  {"..", suite, "results", "NSolveValues_results_new", "dim" <> ToString[dim]},
   If[suite == "sparse", {"nonzero" <> ToString[nonzero]}, {}]]];
 rootsDir = FileNameJoin[{baseDir, "roots"}];
 CreateDirectory[rootsDir, CreateIntermediateDirectories -> True];

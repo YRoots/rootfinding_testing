@@ -60,8 +60,8 @@ METHODS = {
         "color": "navy",
     },
     "MTV": {
-        "path": "results/telen_results/dim{dim}/nonzero{nonzero}/{arg}.txt",
-        "roots": "results/telen_results/dim{dim}/nonzero{nonzero}",
+        "path": "results/telen_results_new/dim{dim}/nonzero{nonzero}/{arg}.txt",
+        "roots": "results/telen_results_new/dim{dim}/nonzero{nonzero}",
         "color": "tab:purple",
     },
     "Bertini": {

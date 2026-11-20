@@ -63,13 +63,13 @@ METRICS = {
 # systems, so their roots can be compared with each other.
 METHODS = {
     "Yroots": {
-        "path": "results/yroots_results-optimize/dim{dim}/{arg}.txt",
-        "roots": "results/yroots_results-optimize/dim{dim}",
+        "path": "results/yroots_results_new/dim{dim}/{arg}.txt",
+        "roots": "results/yroots_results_new/dim{dim}",
         "color": "royalblue",
     },
     "Jroots": {
-        "path": "results/jroots_results2/dim{dim}/{arg}.txt",
-        "roots": "results/jroots_results2/dim{dim}",
+        "path": "results/jroots_results_new/dim{dim}/{arg}.txt",
+        "roots": "results/jroots_results_new/dim{dim}",
         "roots_reversed": True,
         "color": "navy",
     },
@@ -249,7 +249,7 @@ def plot_metric(dim, arg, max_deg, root_status=None):
 
     out_dir = f"graphs/dim{dim}"
     os.makedirs(out_dir, exist_ok=True)
-    plt.savefig(f"{out_dir}/new_dim{dim}_{arg}.png", bbox_inches="tight")
+    plt.savefig(f"{out_dir}/dim{dim}_{arg}.png", bbox_inches="tight")
     plt.close(fig)
 
 
