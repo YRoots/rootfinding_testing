@@ -102,7 +102,7 @@ METHODS = {
         "color": "m",
     },
     "Chebfun": {
-        "path": "results/chebfun_results/dim{dim}_{arg}.txt",
+        "path": "results/chebfun_results/dim{dim}/{arg}.txt",
         "roots": "results/chebfun_results/dim{dim}",
         "roots_reversed": True,
         "color": "tab:orange",
