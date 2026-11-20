@@ -89,13 +89,9 @@ METHODS = {
             2: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
             3: "results/NSolveValues_results/dim{dim}_{arg}2_cont.txt",
         },
+        # dims 2-3 are plotted from the older "2_cont" run; its roots were
+        # extracted from dim{d}_deg{n}_output2.txt into dim{d}/roots/.
         "roots": "results/NSolveValues_results/dim{dim}",
-        # dims 2-3 are plotted from the older "2_cont" run, whose roots
-        # are inside its per-degree Mathematica output files.
-        "dim_roots": {
-            2: "results/NSolveValues_results/dim{dim}_deg{{deg}}_output2.txt",
-            3: "results/NSolveValues_results/dim{dim}_deg{{deg}}_output2.txt",
-        },
         "roots_reversed": True,
         "color": "tab:red",
     },
@@ -107,7 +103,7 @@ METHODS = {
     },
     "Chebfun": {
         "path": "results/chebfun_results/dim{dim}_{arg}.txt",
-        "roots": "results/chebfun_results/{dim}d_all",
+        "roots": "results/chebfun_results/dim{dim}",
         "roots_reversed": True,
         "color": "tab:orange",
         "dims": {2},
